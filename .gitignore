@@ -31,3 +31,6 @@ android/gradle-8.9/
 android/gradle-8.9-bin.zip
 *.apk
 backend/outputs/
+# 运行时缓存（不提交）
+backend/data/zol_cache/
+backend/data/image_cache/
