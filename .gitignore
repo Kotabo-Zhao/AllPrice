@@ -21,3 +21,12 @@ Thumbs.db
 *.db
 *.sqlite
 logs/
+
+# Android 构建产物
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/gradle-8.9/
+android/gradle-8.9-bin.zip
+*.apk

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">全价比价</string>
+    <string name="splash_subtitle">全网商品 · 智能比价</string>
+    <string name="api_key_title">设置 DeepSeek API Key</string>
+    <string name="api_key_hint">sk-...</string>
+    <string name="api_key_desc">在 platform.deepseek.com 获取（可选，不填则用规则推荐）</string>
+    <string name="save_button">保存</string>
+    <string name="connecting">启动本地服务…</string>
+    <string name="connection_failed">连接失败</string>
+    <string name="connection_success">已连接</string>
+    <string name="no_connection">未连接</string>
+    <string name="menu_refresh">刷新</string>
+    <string name="menu_config">AI 设置</string>
+    <string name="menu_about">关于</string>
+    <string name="about_text">全价比价 v1.0\n全网全平台商品比价系统\nChaquopy + FastAPI + WebView</string>
+    <string name="key_local_only">Key 仅存储在本地，不上传</string>
+</resources>
