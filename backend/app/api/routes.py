@@ -7,6 +7,7 @@
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Optional
 
@@ -107,8 +108,8 @@ async def search(
       "source_status": {platform: healthy}
     }
     """
-    # 并行搜索所有健康数据源（每源限时）
-    results = await registry.search_all(keyword, limit=limit, timeout=12.0)
+    # 并行搜索所有健康数据源（每源限时；mock 兜底秒回，真实源超时只降级）
+    results = await registry.search_all(keyword, limit=limit, timeout=6.0)
 
     # 汇总所有报价
     all_offers = []
@@ -145,7 +146,8 @@ async def search(
     product_list = []
     for p in products:
         best = p.best_offer()
-        rec = ai_service.recommend(p)
+        # AI 推荐走线程池，不阻塞事件循环（DeepSeek 网络慢时不拖慢搜索响应）
+        rec = await asyncio.to_thread(ai_service.recommend, p)
         # 价格快照落库
         for o in p.offers:
             storage.save_price_snapshot(

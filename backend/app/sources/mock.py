@@ -36,12 +36,14 @@ class MockSource(BaseSource):
         self._rng = random.Random(seed)
 
     def search(self, keyword: str, limit: int = 10) -> list[PlatformOffer]:
-        """按关键词匹配模板，返回模拟报价（含优惠券）"""
-        kw = keyword.lower()
+        """按关键词匹配模板；模板未命中时生成泛化兜底商品（保证前端不空白）"""
+        kw = keyword.strip().lower()
         offers: list[PlatformOffer] = []
+        matched = False
         for brand, model, cap, colors, base in self.TEMPLATES:
             if kw and kw not in (brand.lower() + model.lower()):
                 continue
+            matched = True
             for platform, label, ratio in (
                 ("jd", "京东", 1.0),
                 ("taobao", "淘宝", 0.97),
@@ -55,24 +57,47 @@ class MockSource(BaseSource):
                 if cap:
                     params["内存"] = f"{cap}G"
                 params["颜色"] = color
-                coupons = self._coupons_for(platform, price)
-                final, detail = self._finalize(price, coupons)
-                offers.append(PlatformOffer(
-                    platform=platform, platform_label=label,
-                    product_id=f"{platform}-{brand}-{model}-{color}-{int(price)}",
-                    url=f"https://example.com/{platform}/{brand}/{model}",
-                    title=title, image_url="",
-                    list_price=list_price, sale_price=price,
-                    final_price=final, price_detail=detail,
-                    params=params, coupons=coupons,
-                    sales=f"{self._rng.randint(100, 99999)}+",
-                    fetched_at=__import__("datetime").datetime.utcnow(),
+                offers.append(self._make_offer(
+                    platform, label, title, price, list_price, params,
                 ))
                 if len(offers) >= limit:
                     break
             if len(offers) >= limit:
                 break
+
+        # 模板未命中 → 生成基于关键词的泛化商品（保证兜底，标注演示）
+        if not matched or not offers:
+            base = 3000 + self._rng.randint(0, 6000)
+            title = f"{keyword.strip()} 官方旗舰版"
+            params = {"品牌": "演示", "型号": keyword.strip()}
+            for platform, label, ratio in (
+                ("jd", "京东", 1.0),
+                ("taobao", "淘宝", 0.97),
+                ("pdd", "拼多多", 0.92),
+            ):
+                price = round(base * ratio * self._rng.uniform(0.98, 1.02), 2)
+                list_price = round(price * 1.15, 2)
+                offers.append(self._make_offer(
+                    platform, label, title, price, list_price, params,
+                ))
+                if len(offers) >= limit:
+                    break
         return offers
+
+    def _make_offer(self, platform, label, title, price, list_price, params) -> PlatformOffer:
+        coupons = self._coupons_for(platform, price)
+        final, detail = self._finalize(price, coupons)
+        return PlatformOffer(
+            platform=platform, platform_label=label,
+            product_id=f"{platform}-{title}-{int(price)}",
+            url=f"https://example.com/{platform}/{title}",
+            title=title, image_url="",
+            list_price=list_price, sale_price=price,
+            final_price=final, price_detail=detail,
+            params=params, coupons=coupons,
+            sales=f"{self._rng.randint(100, 99999)}+",
+            fetched_at=__import__("datetime").datetime.utcnow(),
+        )
 
     @staticmethod
     def _coupons_for(platform: str, price: float) -> list[Coupon]:
