@@ -127,12 +127,15 @@ class TestSearchFlow:
         page.close()
 
     def test_chart_renders(self, browser):
-        """走势图 canvas 渲染"""
+        """走势图 SVG 渲染（零依赖实现，任何环境可跑）"""
         page = _open_page(browser, VIEWPORTS["desktop"])
         page.fill(".search-box input", "iPhone")
         page.click(".search-btn")
         page.wait_for_selector(".product-card", timeout=15000)
-        page.wait_for_selector(".chart canvas", timeout=8000)
+        page.wait_for_selector(".trend-svg", timeout=8000)
+        # SVG 里应有 path 曲线
+        paths = page.query_selector_all(".trend-svg path")
+        assert len(paths) >= 2, "走势图应包含至少一条曲线和填充区"
         page.close()
 
 
