@@ -215,7 +215,11 @@ async def search(
 
     # 汇总所有报价
     all_offers = []
+    # 真实数据源（ZOL）命中时，mock 演示数据直接丢弃，避免真/假混排
+    has_real = any(platform not in ("mock",) and offers for platform, offers in results.items())
     for platform, offers in results.items():
+        if has_real and platform == "mock":
+            continue
         all_offers.extend(offers)
 
     if not all_offers:
@@ -246,7 +250,11 @@ async def search(
 
     # 序列化
     product_list = []
-    for p in products:
+    # AI 推荐并发执行（多商品时串行 DeepSeek 会拖慢 4~6 倍）
+    recs = await asyncio.gather(
+        *[asyncio.to_thread(ai_service.recommend, p) for p in products]
+    )
+    for p, rec in zip(products, recs):
         # 补充商品级信息（广告语/评分/主图）——演示源生成，真实源跳过
         for item in [p] + p.variants:
             try:
@@ -254,8 +262,6 @@ async def search(
                 MockSource.enrich_product(item)
             except Exception:
                 pass
-        # AI 推荐走线程池（只对主商品，不阻塞事件循环）
-        rec = await asyncio.to_thread(ai_service.recommend, p)
         # 价格快照落库（主商品 + 变体）
         for item in [p] + p.variants:
             for o in item.offers:
@@ -276,6 +282,7 @@ async def search(
         "keyword": keyword,
         "products": product_list,
         "source_status": {p: True for p in registry.available_platforms()},
+        "data_source": "real" if has_real else "demo",  # 真实(ZOL) / 演示(mock)
         "total": len(product_list),
     }
 

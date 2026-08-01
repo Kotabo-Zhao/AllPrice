@@ -148,9 +148,9 @@ class TestSearchFlow:
         page.close()
 
     def test_offer_plans(self, browser):
-        """优惠组合方案：默认展开最低价平台，含方案卡片与明细"""
+        """优惠组合方案：默认展开最低价平台，含方案卡片与明细（mock 商品有券）"""
         page = _open_page(browser, VIEWPORTS["desktop"])
-        _do_search(page)
+        _do_search(page, "耐克")
         # 默认展开（expandedOffer=0）
         page.wait_for_selector(".plans-area", timeout=8000)
         cards = page.query_selector_all(".plan-card")
@@ -183,9 +183,9 @@ class TestSearchFlow:
         page.close()
 
     def test_variant_selector(self, browser):
-        """多规格变体：选择器存在，切换规格价格联动"""
+        """多规格变体：选择器存在，切换规格价格联动（mock 商品含多规格）"""
         page = _open_page(browser, VIEWPORTS["desktop"])
-        _do_search(page, "iPhone")
+        _do_search(page, "耐克")
         items = page.query_selector_all(".ss-item")
         assert len(items) >= 2, f"应有至少2个规格项, 实际{len(items)}"
         price1 = page.inner_text(".hero-price .num")
@@ -219,6 +219,21 @@ class TestSearchFlow:
             return n;
         }""")
         assert bad == 0, f"存在 {bad} 个无优惠步骤的方案"
+        page.close()
+
+    def test_real_data_badge(self, browser):
+        """ZOL 真实数据：显示'真实报价'徽标 + 价格合理（数码商品走真实源）"""
+        page = _open_page(browser, VIEWPORTS["desktop"])
+        _do_search(page, "iPhone 15 Pro", timeout=45000)
+        page.wait_for_timeout(3000)
+        badge = page.inner_text(".data-badge")
+        assert badge == "真实报价", f"应显示真实报价徽标, 实际: {badge}"
+        # 价格应为真实数值（非演示的随机整百）
+        price = page.inner_text(".hero-price .num") if page.query_selector(".hero-price .num") else ""
+        assert price and price.replace(",", "").replace("¥", "").strip() != "", "缺少价格"
+        # 图片为真实 http 图
+        src = page.get_attribute(".hero-img", "src") or ""
+        assert src.startswith("http"), f"真实数据应显示真实图, 实际: {src[:50]}"
         page.close()
 
     def test_brand_search_nav(self, browser):

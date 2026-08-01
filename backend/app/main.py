@@ -14,7 +14,6 @@ import os
 
 from .api.routes import router
 from .sources.base import SourceRegistry
-from .sources.jd import JDSource
 
 logging.basicConfig(
     level=logging.INFO,
@@ -29,17 +28,14 @@ async def lifespan(app: FastAPI):
     registry: SourceRegistry = getattr(app.state, "registry", None)
     if registry is None:
         registry = SourceRegistry()
-        # 演示/兜底数据源（保证前端开发期有数据）
+        # ZOL 真实报价源（手机/电脑/数码全覆盖；SSR 可抓，真实价格+参数+图）
+        from .sources.zol import ZolSource
+        registry.register(ZolSource())
+        # 演示/兜底数据源（保证前端开发期有数据；ZOL 未覆盖品类自动落此源）
         from .sources.mock import MockSource
         registry.register(MockSource())
-        # 京东公开接口（免费；网络受限时自动熔断，不影响 mock）
-        registry.register(JDSource())
-        # 淘宝/拼多多爬虫（Playwright；网络受限时自动降级）
-        from .sources.taobao import TaobaoSource
-        from .sources.pdd import PddSource
-        registry.register(TaobaoSource())
-        registry.register(PddSource())
-        # TODO(v3): 闲鱼/抖音 适配器
+        # 注：jd/taobao/pdd 接口全部反爬失效（登录+签名+风控），不再注册，
+        #     避免每次搜索空等超时；后续有真实通道（官方API/登录态）再接入
         app.state.registry = registry
     log.info(f"AllPrice started with platforms: {registry.available_platforms()}")
     yield

@@ -103,6 +103,9 @@
     border:1px solid rgba(212,175,55,.4);color:var(--gold2);
     padding:3px 12px;border-radius:999px;font-size:12px;font-weight:600;letter-spacing:1px;
   }
+  .data-badge{font-size:10px;font-weight:700;padding:3px 10px;border-radius:999px;letter-spacing:.5px}
+  .db-real{background:rgba(61,191,122,.14);color:#3dbf7a;border:1px solid rgba(61,191,122,.35)}
+  .db-demo{background:rgba(150,150,150,.12);color:var(--text3);border:1px solid var(--line)}
   .hero-title{font-size:22px;font-weight:800;letter-spacing:.5px;margin:8px 0 4px}
   .hero-slogan{
     color:var(--gold2);font-size:14px;letter-spacing:2px;margin-bottom:8px;
@@ -452,6 +455,7 @@
         <div class="hero-info">
           <div class="hero-top">
             <span class="brand-badge">{{ p.brand || '品牌' }}</span>
+            <span class="data-badge" :class="dataSource==='real' ? 'db-real' : 'db-demo'">{{ dataSource==='real' ? '真实报价' : '演示数据' }}</span>
             <span class="stars" v-if="currentOf(p).rating">★ {{ currentOf(p).rating }}</span>
             <span v-if="currentOf(p).review_count">{{ fmtCount(currentOf(p).review_count) }} 条评价</span>
           </div>
@@ -708,6 +712,7 @@ createApp({
     const keyword = ref('');
     const products = ref([]);
     const searched = ref(false);
+    const dataSource = ref('demo');
     const loading = ref(false);
     const errorMsg = ref('');
     const emptyMsg = ref('');
@@ -874,6 +879,7 @@ createApp({
         if(!r.ok) throw new Error(d.detail || '请求失败');
         if(d.products && d.products.length){
           products.value = d.products;
+          dataSource.value = d.data_source || 'demo';
           searched.value = true;
           expandedOffer.value = 0;  // 默认展开最低价平台
           // 异步补真实商品图（Bing 图片搜索，不阻塞渲染）
@@ -1038,7 +1044,7 @@ createApp({
 
     document.documentElement.setAttribute('data-theme', theme.value);
 
-    return { keyword, products, searched, loading, errorMsg, emptyMsg, theme,
+    return { keyword, products, searched, loading, errorMsg, emptyMsg, theme, dataSource,
              hotKeywords, fallbackImg, pngOf, srcLabel, realImgOf, onImgErr,
              fmt, fmtCount, bestOf, specChipsOf, sortedOffersOf, platColorOf, priceGapOf,
              curMain, allVariantsOf, activeIdxOf, currentOf, selectVariant, variantShortName,
