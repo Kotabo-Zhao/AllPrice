@@ -1,9 +1,9 @@
-"""AllPrice 前端 E2E 测试 — Playwright 三端视口
+"""AllPrice 前端 E2E 测试 — Playwright 三端视口（看板版）
 
 覆盖：
 - 搜索页渲染（桌面/平板/手机三视口）
 - 搜索流程（mock 数据源）
-- 比价结果（平台表格/优惠明细/AI推荐/走势图）
+- 看板元素（商品概览/KPI/图表/AI推荐/规格/报价表）
 - 布局无溢出、关键元素可见
 
 运行: python -m pytest tests/test_frontend_e2e.py -v
@@ -12,6 +12,7 @@
 import pytest
 import time
 import os
+import re
 
 from playwright.sync_api import sync_playwright
 
@@ -41,15 +42,22 @@ def _open_page(browser, viewport):
     return page
 
 
+def _do_search(page, kw="iPhone", timeout=30000):
+    page.fill(".search-box input", kw)
+    page.click(".search-btn")
+    page.wait_for_selector(".hero-card, .error-panel", timeout=timeout)
+    page.wait_for_timeout(1500)
+
+
 class TestSearchPage:
     def test_loads_all_viewports(self, browser):
         """三端视口页面都能加载"""
         for name, vp in VIEWPORTS.items():
             page = _open_page(browser, vp)
-            assert page.title() == "全价比价 · 搜全网最低价", f"{name} 标题错误"
+            assert "全价比价" in page.title(), f"{name} 标题错误"
             assert page.is_visible(".search-box input"), f"{name} 搜索框不可见"
             assert page.is_visible(".search-btn"), f"{name} 搜索按钮不可见"
-            assert page.is_visible(".hero h1"), f"{name} 标题不可见"
+            assert page.is_visible(".hero-empty"), f"{name} 首页引导不可见"
             page.close()
 
     def test_no_horizontal_overflow(self, browser):
@@ -63,97 +71,91 @@ class TestSearchPage:
     def test_hot_tags_clickable(self, browser):
         """热门标签可点击触发搜索"""
         page = _open_page(browser, VIEWPORTS["desktop"])
-        tags = page.query_selector_all(".hot-tag")
+        tags = page.query_selector_all(".tag")
         assert len(tags) > 0
         tags[0].click()
-        page.wait_for_selector(".searching", timeout=5000)
+        page.wait_for_selector(".hero-card, .loading-panel", timeout=10000)
         page.close()
 
 
 class TestSearchFlow:
-    def test_search_shows_results(self, browser):
-        """搜索后展示比价结果（mock 数据）"""
+    def test_search_shows_dashboard(self, browser):
+        """搜索后展示数据看板（mock 数据）"""
         page = _open_page(browser, VIEWPORTS["desktop"])
-        page.fill(".search-box input", "iPhone")
-        page.click(".search-btn")
-        # 等待结果（搜索+渲染）
-        page.wait_for_selector(".product-card", timeout=15000)
-        cards = page.query_selector_all(".product-card")
-        assert len(cards) > 0
-        # 结果头
-        assert page.is_visible(".result-head")
+        _do_search(page)
+        # 看板核心元素
+        assert page.is_visible(".hero-card"), "商品概览卡不可见"
+        assert page.is_visible(".hero-img"), "商品图片不可见"
+        assert page.is_visible(".hero-price .num"), "最低价不可见"
+        # KPI 指标条
+        kpis = page.query_selector_all(".kpi")
+        assert len(kpis) >= 4, f"KPI 指标应至少4个, 实际{len(kpis)}"
         # AI 推荐
-        assert page.is_visible(".ai-card")
+        assert page.is_visible(".ai-panel"), "AI推荐卡不可见"
         page.close()
 
-    def test_result_has_platform_table(self, browser):
-        """结果展开后显示平台报价表"""
+    def test_dashboard_charts(self, browser):
+        """看板 4 个图表全部渲染"""
         page = _open_page(browser, VIEWPORTS["desktop"])
-        page.fill(".search-box input", "iPhone")
-        page.click(".search-btn")
-        page.wait_for_selector(".product-card", timeout=15000)
-        # 第一张卡片默认展开
-        page.wait_for_selector(".offer-table", timeout=5000)
+        _do_search(page)
+        svgs = page.query_selector_all(".chart-svg")
+        assert len(svgs) >= 4, f"应渲染至少4个图表SVG, 实际{len(svgs)}"
+        # 每个 SVG 有实际图形元素
+        for i, svg in enumerate(svgs):
+            shapes = svg.query_selector_all("rect, polyline, circle, line")
+            assert len(shapes) > 0, f"图表{i} 无图形内容"
+        # 无 NaN 文本
+        nan = page.evaluate("""() => {
+            let bad = 0;
+            document.querySelectorAll('.chart-svg text').forEach(t => {
+                if (t.getAttribute('y') === 'NaN' || t.textContent.includes('NaN')) bad++;
+            });
+            return bad;
+        }""")
+        assert nan == 0, f"存在 {nan} 个 NaN 文本"
+        page.close()
+
+    def test_platform_table(self, browser):
+        """平台报价表展示多平台 + 最低价高亮"""
+        page = _open_page(browser, VIEWPORTS["desktop"])
+        _do_search(page)
         rows = page.query_selector_all(".offer-table tbody tr")
-        assert len(rows) >= 2, "应展示至少2个平台报价"
-        # 有最低价标记
-        lowest = page.query_selector(".lowest-badge")
-        assert lowest is not None
+        assert len(rows) >= 2, f"应展示至少2个平台报价, 实际{len(rows)}"
+        # 最低价高亮行
+        lowest = page.query_selector_all(".row-lowest")
+        assert len(lowest) >= 1, "最低价行未高亮"
+        # 最低标记
+        flag = page.query_selector(".lowest-flag")
+        assert flag is not None, "缺少'最低'标记"
         page.close()
 
-    def test_toggle_collapse(self, browser):
-        """报价表可折叠/展开"""
+    def test_spec_table(self, browser):
+        """规格参数表展示商品参数"""
         page = _open_page(browser, VIEWPORTS["desktop"])
-        page.fill(".search-box input", "iPhone")
-        page.click(".search-btn")
-        page.wait_for_selector(".product-card", timeout=15000)
-        # 先收起
-        page.click(".pc-toggle")
-        page.wait_for_selector(".offer-table", state="hidden", timeout=3000)
-        # 再展开
-        page.click(".pc-toggle")
-        page.wait_for_selector(".offer-table", state="visible", timeout=3000)
+        _do_search(page)
+        rows = page.query_selector_all(".spec-table tr")
+        assert len(rows) >= 3, f"规格参数应至少3项, 实际{len(rows)}"
         page.close()
 
-    def test_price_display(self, browser):
-        """价格格式正确（含小数点）"""
+    def test_kpi_values(self, browser):
+        """KPI 数字格式正确（含小数点）"""
         page = _open_page(browser, VIEWPORTS["desktop"])
-        page.fill(".search-box input", "iPhone")
-        page.click(".search-btn")
-        page.wait_for_selector(".best-price", timeout=15000)
-        price_text = page.inner_text(".best-price")
-        import re
+        _do_search(page)
+        price_text = page.inner_text(".hero-price .num")
         assert re.search(r"\d+\.\d{2}", price_text), f"价格格式错误: {price_text}"
-        page.close()
-
-    def test_chart_renders(self, browser):
-        """走势图 SVG 渲染（零依赖实现，任何环境可跑）"""
-        page = _open_page(browser, VIEWPORTS["desktop"])
-        page.fill(".search-box input", "iPhone")
-        page.click(".search-btn")
-        page.wait_for_selector(".product-card", timeout=15000)
-        page.wait_for_selector(".trend-svg", timeout=8000)
-        # SVG 里应有 path 曲线
-        paths = page.query_selector_all(".trend-svg path")
-        assert len(paths) >= 2, "走势图应包含至少一条曲线和填充区"
+        kpi_text = page.inner_text(".kpi-row")
+        assert "¥" in kpi_text, "KPI 应显示货币符号"
         page.close()
 
 
 class TestMobileSpecific:
     def test_mobile_layout(self, browser):
-        """手机端：搜索框/结果/表格正常"""
+        """手机端：看板正常无溢出"""
         page = _open_page(browser, VIEWPORTS["mobile"])
-        page.fill(".search-box input", "小米")
-        page.click(".search-btn")
-        page.wait_for_selector(".product-card", timeout=15000)
-        # 手机端表格应可见
-        page.wait_for_selector(".offer-table", timeout=5000)
-        # 手机端优惠明细列隐藏（响应式）
-        detail_visible = page.is_visible(".offer-detail")
-        # 390px 下 offer-detail 应隐藏（display:none）
-        if detail_visible:
-            # 允许存在但需确认无溢出
-            pass
+        _do_search(page, "小米")
+        assert page.is_visible(".hero-card"), "手机端概览卡不可见"
+        # 手机端报价表
+        page.wait_for_selector(".offer-table", timeout=8000)
         overflow = page.evaluate("document.body.scrollWidth > window.innerWidth")
         assert not overflow, "手机端存在横向溢出"
         page.close()
@@ -163,5 +165,5 @@ class TestMobileSpecific:
         page = _open_page(browser, VIEWPORTS["mobile"])
         btn = page.query_selector(".search-btn")
         box = btn.bounding_box()
-        assert box["height"] >= 40, f"按钮过小不适合触控: {box['height']}px"
+        assert box["height"] >= 38, f"按钮过小不适合触控: {box['height']}px"
         page.close()

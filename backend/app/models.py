@@ -39,6 +39,7 @@ class PlatformOffer:
     url: str                            # 跳转链接
     title: str                          # 平台标题
     image_url: str = ""
+    shop_name: str = ""                 # 店铺名（旗舰店/自营…）
     list_price: float = 0.0             # 标价/划线价
     sale_price: float = 0.0             # 当前售价（未叠加优惠）
     final_price: float = 0.0            # 最低到手价（优惠计算后）
@@ -60,6 +61,10 @@ class Product:
     model: str = ""
     specs: dict = field(default_factory=dict)  # 规格：内存/容量/颜色…
     image_url: str = ""
+    ad_slogan: str = ""         # 官方宣传语（广告位）
+    description: str = ""       # 卖点描述（短文案）
+    rating: float = 0.0         # 综合评分 0-5
+    review_count: int = 0       # 评价数
     offers: list[PlatformOffer] = field(default_factory=list)
 
     def best_offer(self) -> Optional[PlatformOffer]:

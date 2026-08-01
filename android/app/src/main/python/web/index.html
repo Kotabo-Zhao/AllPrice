@@ -3,438 +3,715 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>全价比价 · 搜全网最低价</title>
+<title>全价比价 · 全网商品智能比价</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#f7f5f0">
+<meta name="theme-color" content="#0b0e14">
 <script src="vue.global.prod.js"></script>
 <style>
+  /* ═══════════ 设计令牌 ═══════════ */
   :root{
-    --bg:#f7f5f0; --card:#fff; --text:#1f2328; --text2:#5c6270; --text3:#9aa1ad;
-    --border:#e6e2d8; --line:#eee9df;
-    --accent:#c0392b; --accent-soft:#faf0ee;   /* 朱砂 */
-    --green:#1e9e5a; --green-bg:#e9f7ef;
-    --amber:#b8860b; --amber-bg:#fbf4e3;
-    --ink:#2f3b4c;
-    --radius:12px; --radius-sm:8px;
-    --shadow:0 1px 3px rgba(47,59,76,.06),0 4px 16px rgba(47,59,76,.05);
-    --font-ui:-apple-system,"PingFang SC","Noto Sans SC","Microsoft YaHei",sans-serif;
-    --font-serif:"Songti SC","Noto Serif SC","SimSun",serif;
-  }
-  [data-theme="dark"]{
-    --bg:#16181d; --card:#1e2128; --text:#e8e6e0; --text2:#a0a5b0; --text3:#6b7078;
-    --border:#2e323b; --line:#292d35;
-    --accent:#e2604f; --accent-soft:#33201d;
-    --green:#4dbb7f; --green-bg:#12261b;
-    --amber:#d3a34a; --amber-bg:#2a2413;
-    --ink:#d5dbe4;
-    --shadow:0 1px 3px rgba(0,0,0,.4);
+    --bg:#0b0e14; --bg2:#10141d; --card:#141926; --card2:#1a2131;
+    --line:#232c40; --line2:#2c3852;
+    --text:#e8ecf4; --text2:#9aa5b8; --text3:#5c6a85;
+    --gold:#d4af37; --gold2:#f0d68a;
+    --up:#ff5d5d; --down:#3dd68c;
+    --accent:#4d9fff; --purple:#8b7cf6;
+    --shadow:0 8px 32px rgba(0,0,0,.45);
+    --radius:14px;
+    --font: -apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
   }
   *{margin:0;padding:0;box-sizing:border-box}
-  body{background:var(--bg);color:var(--text);font-family:var(--font-ui);line-height:1.6;-webkit-font-smoothing:antialiased;transition:background .25s,color .25s}
-  #app{min-height:100dvh;display:flex;flex-direction:column}
-
-  /* ═══ Header ═══ */
-  .header{position:sticky;top:0;z-index:50;background:var(--bg);border-bottom:1px solid var(--line);backdrop-filter:blur(12px)}
-  .header-inner{max-width:1080px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;gap:16px}
-  .logo{display:flex;align-items:center;gap:8px;cursor:pointer;flex-shrink:0}
-  .logo-mark{width:30px;height:30px;border-radius:8px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--font-serif);font-size:16px;font-weight:600}
-  .logo-name{font-size:17px;font-weight:600;letter-spacing:1px;font-family:var(--font-serif)}
-  .logo-sub{font-size:11px;color:var(--text3);letter-spacing:2px;margin-top:-2px}
-  .header-right{margin-left:auto;display:flex;align-items:center;gap:10px}
-  .icon-btn{width:32px;height:32px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;transition:all .15s}
-  .icon-btn:hover{border-color:var(--accent);color:var(--accent)}
-
-  /* ═══ Hero Search ═══ */
-  .hero{padding:48px 20px 40px;text-align:center}
-  .hero h1{font-size:clamp(26px,4.5vw,38px);font-weight:600;font-family:var(--font-serif);letter-spacing:2px;margin-bottom:8px}
-  .hero .slogan{font-size:14px;color:var(--text2);margin-bottom:28px;letter-spacing:.5px}
-  .search-box{max-width:640px;margin:0 auto;display:flex;gap:0;background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:5px;box-shadow:var(--shadow);transition:border .2s}
-  .search-box:focus-within{border-color:var(--accent)}
-  .search-box input{flex:1;border:none;outline:none;background:transparent;padding:12px 16px;font-size:16px;color:var(--text);font-family:var(--font-ui)}
-  .search-box input::placeholder{color:var(--text3)}
-  .search-btn{border:none;background:var(--accent);color:#fff;border-radius:10px;padding:0 26px;font-size:15px;font-weight:500;cursor:pointer;transition:background .15s;letter-spacing:1px}
-  .search-btn:hover{background:#a83226}
-  .search-btn:disabled{opacity:.5;cursor:not-allowed}
-  .hot-tags{margin-top:16px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
-  .hot-tag{font-size:12px;color:var(--text2);background:var(--card);border:1px solid var(--border);padding:4px 12px;border-radius:20px;cursor:pointer;transition:all .15s}
-  .hot-tag:hover{color:var(--accent);border-color:var(--accent)}
-
-  /* ═══ Main ═══ */
-  .main{flex:1;max-width:1080px;margin:0 auto;padding:0 20px 80px;width:100%}
-  .searching{padding:60px 0;text-align:center}
-  .spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;margin:0 auto 16px;animation:spin .8s linear infinite}
-  @keyframes spin{to{transform:rotate(360deg)}}
-  .searching p{color:var(--text2);font-size:14px}
-  .search-status{margin-top:10px;font-size:12px;color:var(--text3)}
-
-  /* ═══ Result Header ═══ */
-  .result-head{display:flex;align-items:baseline;gap:12px;margin:28px 0 6px;flex-wrap:wrap}
-  .result-head .kw{font-size:22px;font-weight:600;font-family:var(--font-serif)}
-  .result-head .cnt{font-size:13px;color:var(--text3)}
-  .result-meta{font-size:12px;color:var(--text3);margin-bottom:20px;display:flex;gap:16px;flex-wrap:wrap}
-  .result-meta .src{display:flex;align-items:center;gap:4px}
-  .src-dot{width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block}
-  .src-dot.off{background:var(--text3)}
-
-  /* ═══ Product Card ═══ */
-  .product-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:18px;overflow:hidden;box-shadow:var(--shadow)}
-  .pc-top{display:flex;gap:16px;padding:18px 20px;align-items:flex-start}
-  .pc-thumb{width:84px;height:84px;border-radius:10px;background:var(--bg);border:1px solid var(--line);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:28px;overflow:hidden}
-  .pc-thumb img{width:100%;height:100%;object-fit:cover}
-  .pc-info{flex:1;min-width:0}
-  .pc-title{font-size:16px;font-weight:600;line-height:1.5;margin-bottom:6px}
-  .pc-specs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
-  .spec-pill{font-size:11px;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:2px 8px;color:var(--text2)}
-  .pc-best{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:4px}
-  .best-price{font-size:26px;font-weight:700;color:var(--accent)}
-  .best-price .cur{font-size:15px;font-weight:500;margin-right:2px}
-  .best-label{font-size:12px;background:var(--accent-soft);color:var(--accent);padding:3px 10px;border-radius:6px;font-weight:500}
-  .best-save{font-size:12px;color:var(--green)}
-  .pc-toggle{width:100%;border:none;background:var(--bg);border-top:1px solid var(--line);padding:10px;color:var(--text2);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background .15s}
-  .pc-toggle:hover{background:var(--line)}
-  .pc-toggle .arrow{transition:transform .2s;display:inline-block}
-  .pc-toggle.open .arrow{transform:rotate(180deg)}
-
-  /* ═══ Platform Offer Table ═══ */
-  .offer-table{width:100%;border-collapse:collapse;font-size:13.5px}
-  .offer-table th{background:var(--bg);color:var(--text2);font-weight:500;font-size:12px;padding:8px 12px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
-  .offer-table td{padding:12px;border-bottom:1px solid var(--line);vertical-align:middle}
-  .offer-table tr:last-child td{border-bottom:none}
-  .offer-table tr:hover td{background:var(--bg)}
-  .plat{display:flex;align-items:center;gap:8px;font-weight:500;white-space:nowrap}
-  .plat-badge{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;flex-shrink:0}
-  .plat-jd{background:#e1251b}.plat-taobao{background:#ff5000}.plat-pdd{background:#e02e24}.plat-mock{background:#8b8f99}
-  .offer-price{font-weight:600;white-space:nowrap}
-  .offer-sale{font-size:12px;color:var(--text3);text-decoration:line-through;margin-left:6px;font-weight:400}
-  .offer-final{font-weight:700;color:var(--accent);white-space:nowrap}
-  .offer-final .tag{font-size:10px;background:var(--accent-soft);color:var(--accent);border-radius:4px;padding:1px 5px;margin-left:4px;vertical-align:1px}
-  .offer-detail{font-size:12px;color:var(--text2);max-width:260px;line-height:1.5}
-  .offer-buy{border:1px solid var(--accent);color:var(--accent);background:transparent;border-radius:8px;padding:6px 16px;font-size:12.5px;cursor:pointer;transition:all .15s;white-space:nowrap}
-  .offer-buy:hover{background:var(--accent);color:#fff}
-  .offer-lowest{background:var(--green-bg)!important}
-  .lowest-badge{display:inline-block;background:var(--green);color:#fff;font-size:10px;border-radius:4px;padding:1px 6px;margin-left:6px;vertical-align:1px}
-
-  /* ═══ AI Recommend ═══ */
-  .ai-card{margin:22px 0;border-radius:var(--radius);padding:18px 20px;display:flex;gap:14px;align-items:flex-start;border:1px solid var(--amber);background:var(--amber-bg)}
-  .ai-icon{width:34px;height:34px;border-radius:9px;background:var(--amber);color:#fff;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
-  .ai-body{flex:1;min-width:0}
-  .ai-title{font-weight:600;font-size:14.5px;margin-bottom:6px}
-  .ai-text{font-size:13.5px;color:var(--text2);line-height:1.7}
-  .ai-text b{color:var(--amber)}
-
-  /* ═══ Price Trend ═══ */
-  .trend-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;margin-bottom:20px;box-shadow:var(--shadow)}
-  .trend-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
-  .trend-title{font-size:15px;font-weight:600}
-  .trend-sub{font-size:12px;color:var(--text3)}
-  .trend-svg{width:100%;height:260px;display:block}
-  .trend-legend{display:flex;gap:18px;margin-top:10px;flex-wrap:wrap}
-  .legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)}
-  .legend-item i{width:16px;height:3px;border-radius:2px;display:inline-block}
-
-  /* ═══ Empty / Error ═══ */
-  .empty{padding:70px 20px;text-align:center}
-  .empty-icon{font-size:44px;margin-bottom:14px;opacity:.6}
-  .empty h3{font-size:17px;margin-bottom:8px}
-  .empty p{font-size:13px;color:var(--text2);max-width:420px;margin:0 auto}
-
-  /* ═══ Toast ═══ */
-  .toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;transition:opacity .25s,transform .25s;pointer-events:none}
-  .toast.show{opacity:1}
-
-  /* ═══ Footer ═══ */
-  .footer{text-align:center;padding:24px 20px 40px;color:var(--text3);font-size:12px;border-top:1px solid var(--line)}
-
-  /* ═══ Responsive ═══ */
-  @media(max-width:768px){
-    .hero{padding:36px 16px 30px}
-    .main{padding:0 14px 70px}
-    .pc-top{padding:14px 16px;gap:12px}
-    .pc-thumb{width:68px;height:68px}
-    .best-price{font-size:22px}
-    .offer-table{font-size:12.5px}
-    .offer-table th,.offer-table td{padding:9px 8px}
-    .offer-detail{display:none}
-    .offer-buy{padding:5px 12px;font-size:12px}
-    .trend-svg{height:220px}
-    .pc-title{font-size:14.5px}
-    .search-box input{font-size:15px;padding:10px 14px}
-    .search-btn{padding:0 18px}
-    .ai-card{padding:14px 16px}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:var(--font); min-height:100vh;
+    background-image:
+      radial-gradient(1000px 500px at 80% -10%, rgba(77,159,255,.07), transparent),
+      radial-gradient(800px 400px at -10% 110%, rgba(139,124,246,.06), transparent);
   }
-  @media(max-width:420px){
-    .offer-sale{display:none}
-    .result-head .kw{font-size:19px}
-    .plat-badge{width:20px;height:20px;font-size:10px}
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-thumb{background:#2c3852;border-radius:4px}
+  [v-cloak]{display:none}
+  .wrap{max-width:1240px;margin:0 auto;padding:0 20px}
+
+  /* ═══════════ 顶部搜索 ═══════════ */
+  .topbar{
+    position:sticky;top:0;z-index:50;
+    background:rgba(11,14,20,.85);backdrop-filter:blur(14px);
+    border-bottom:1px solid var(--line); padding:14px 0;
+  }
+  .topbar-inner{display:flex;align-items:center;gap:16px}
+  .logo{display:flex;align-items:center;gap:10px;font-size:19px;font-weight:800;letter-spacing:1px;white-space:nowrap}
+  .logo-mark{
+    width:34px;height:34px;border-radius:10px;display:grid;place-items:center;
+    background:linear-gradient(135deg,#d4af37,#8a5a12);
+    font-size:17px;color:#fff;box-shadow:0 0 20px rgba(212,175,55,.35);
+  }
+  .logo b{background:linear-gradient(90deg,#f0d68a,#d4af37);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .search-box{
+    flex:1;display:flex;align-items:center;gap:10px;
+    background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:10px 14px;transition:border-color .2s;
+  }
+  .search-box:focus-within{border-color:var(--gold);box-shadow:0 0 0 3px rgba(212,175,55,.12)}
+  .search-box .s-icon{color:var(--text3);font-size:16px}
+  .search-box input{
+    flex:1;background:none;border:none;outline:none;color:var(--text);
+    font-size:15px;font-family:var(--font);
+  }
+  .search-box input::placeholder{color:var(--text3)}
+  .search-btn{
+    border:none;border-radius:9px;padding:9px 22px;cursor:pointer;
+    background:linear-gradient(135deg,#d4af37,#b8860b);color:#1a1505;font-weight:700;
+    font-size:14px;letter-spacing:1px;transition:transform .15s,box-shadow .2s;
+    font-family:var(--font);
+  }
+  .search-btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(212,175,55,.35)}
+  .search-btn:disabled{opacity:.5;cursor:wait;transform:none}
+  .theme-btn{
+    background:var(--card);border:1px solid var(--line);color:var(--text2);
+    border-radius:10px;padding:9px 13px;cursor:pointer;font-size:15px;font-family:var(--font);
+  }
+  .hot-tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .tag{
+    background:var(--card);border:1px solid var(--line);color:var(--text2);
+    border-radius:999px;padding:5px 13px;font-size:12px;cursor:pointer;transition:all .2s;
+    font-family:var(--font);
+  }
+  .tag:hover{border-color:var(--gold);color:var(--gold)}
+
+  /* ═══════════ 商品概览 Hero ═══════════ */
+  .hero-card{
+    display:grid;grid-template-columns:240px 1fr;gap:28px;
+    background:linear-gradient(135deg,var(--card) 0%,var(--card2) 100%);
+    border:1px solid var(--line);border-radius:var(--radius);
+    padding:28px;margin-top:22px;box-shadow:var(--shadow);
+    position:relative;overflow:hidden;
+  }
+  .hero-card::before{
+    content:'';position:absolute;top:0;left:0;right:0;height:2px;
+    background:linear-gradient(90deg,transparent,#d4af37,transparent);
+  }
+  .hero-img-wrap{
+    border-radius:12px;overflow:hidden;border:1px solid var(--line2);
+    background:#0d1120;display:grid;place-items:center;align-self:start;
+  }
+  .hero-img{width:100%;display:block;aspect-ratio:1;object-fit:cover}
+  .hero-info{min-width:0}
+  .hero-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .brand-badge{
+    background:linear-gradient(135deg,rgba(212,175,55,.18),rgba(212,175,55,.06));
+    border:1px solid rgba(212,175,55,.4);color:var(--gold2);
+    padding:3px 12px;border-radius:999px;font-size:12px;font-weight:600;letter-spacing:1px;
+  }
+  .hero-title{font-size:22px;font-weight:800;letter-spacing:.5px;margin:8px 0 4px}
+  .hero-slogan{
+    color:var(--gold2);font-size:14px;letter-spacing:2px;margin-bottom:8px;
+    font-style:italic;
+  }
+  .hero-desc{color:var(--text2);font-size:13px;line-height:1.7;margin-bottom:14px}
+  .hero-meta{display:flex;align-items:center;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--text2)}
+  .stars{color:var(--gold);letter-spacing:2px;font-size:15px}
+  .spec-chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .chip{
+    background:rgba(77,159,255,.08);border:1px solid rgba(77,159,255,.25);color:#9cc3ff;
+    padding:4px 12px;border-radius:8px;font-size:12px;
+  }
+  .chip b{font-weight:600}
+  .hero-price{text-align:right;display:flex;flex-direction:column;justify-content:center;gap:4px;min-width:180px}
+  .hero-price .label{color:var(--text3);font-size:12px;letter-spacing:2px}
+  .hero-price .num{
+    font-size:40px;font-weight:900;line-height:1;
+    background:linear-gradient(180deg,#fff,#d4af37);
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+    font-variant-numeric:tabular-nums;
+  }
+  .hero-price .platform{color:var(--gold2);font-size:13px;font-weight:600}
+
+  /* ═══════════ KPI 指标条 ═══════════ */
+  .kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-top:14px}
+  .kpi{
+    background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:14px 16px;position:relative;overflow:hidden;transition:transform .2s;
+  }
+  .kpi:hover{transform:translateY(-2px);border-color:var(--line2)}
+  .kpi::after{
+    content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+    background:linear-gradient(180deg,var(--gold),transparent);opacity:.7;
+  }
+  .kpi .k-label{color:var(--text3);font-size:11px;letter-spacing:1.5px;margin-bottom:6px}
+  .kpi .k-value{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--text)}
+  .kpi .k-sub{color:var(--text3);font-size:11px;margin-top:3px}
+  .kpi.accent .k-value{color:var(--gold2)}
+
+  /* ═══════════ 图表网格 ═══════════ */
+  .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+  .panel{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:20px;min-width:0;
+  }
+  .panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .panel-title{font-size:14px;font-weight:700;letter-spacing:1px;display:flex;align-items:center;gap:8px}
+  .panel-title .dot{width:7px;height:7px;border-radius:50%;background:var(--gold);box-shadow:0 0 8px rgba(212,175,55,.8)}
+  .panel-sub{color:var(--text3);font-size:11px}
+  .chart-svg{width:100%;display:block;max-width:100%;overflow:visible}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px}
+  .legend-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2)}
+  .legend-item i{width:14px;height:3px;border-radius:2px;display:inline-block}
+
+  /* ═══════════ AI 推荐 ═══════════ */
+  .ai-panel{
+    margin-top:14px;position:relative;overflow:hidden;
+    background:linear-gradient(135deg,rgba(139,124,246,.12),rgba(77,159,255,.06) 50%,var(--card));
+    border:1px solid rgba(139,124,246,.35);border-radius:var(--radius);padding:20px 24px;
+  }
+  .ai-panel::before{
+    content:'';position:absolute;top:0;left:0;right:0;height:2px;
+    background:linear-gradient(90deg,var(--purple),var(--accent),transparent);
+  }
+  .ai-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .ai-badge{
+    background:linear-gradient(135deg,var(--purple),#6a5ae0);color:#fff;
+    padding:3px 12px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:1px;
+  }
+  .ai-head .ai-label{color:var(--text2);font-size:12px}
+  .ai-body{color:var(--text);font-size:14px;line-height:1.9}
+  .ai-body b{color:var(--gold2)}
+
+  /* ═══════════ 规格参数 ═══════════ */
+  .spec-table{width:100%;border-collapse:collapse;font-size:13px}
+  .spec-table td{padding:8px 14px;border-bottom:1px solid var(--line)}
+  .spec-table tr:nth-child(odd) td{background:rgba(255,255,255,.015)}
+  .spec-table td:first-child{color:var(--text3);width:130px;white-space:nowrap}
+  .spec-table td:last-child{color:var(--text)}
+
+  /* ═══════════ 平台报价表 ═══════════ */
+  .offer-table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+  .offer-table th{
+    text-align:left;padding:10px 14px;color:var(--text3);font-size:11px;
+    letter-spacing:1.5px;border-bottom:1px solid var(--line2);font-weight:600;
+  }
+  .offer-table td{padding:13px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+  .offer-table tr:last-child td{border-bottom:none}
+  .offer-table tr:hover td{background:rgba(255,255,255,.02)}
+  .plat-badge{display:inline-flex;align-items:center;gap:6px;font-weight:700}
+  .plat-dot{width:9px;height:9px;border-radius:50%}
+  .row-lowest{background:rgba(61,214,140,.05)}
+  .row-lowest td:first-child{border-left:3px solid var(--down)}
+  .offer-final{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums}
+  .offer-save{color:var(--down);font-size:11px;font-weight:600}
+  .offer-detail{color:var(--text3);font-size:11px;margin-top:3px}
+  .offer-sales{color:var(--text2);font-size:12px}
+  .offer-stock{font-size:11px}
+  .stock-yes{color:var(--down)} .stock-no{color:var(--up)}
+  .go-btn{
+    display:inline-block;padding:7px 18px;border-radius:8px;text-decoration:none;
+    background:var(--card2);border:1px solid var(--line2);color:var(--text);
+    font-size:12px;font-weight:600;transition:all .2s;white-space:nowrap;
+  }
+  .go-btn:hover{border-color:var(--gold);color:var(--gold);transform:translateY(-1px)}
+  .lowest-flag{
+    display:inline-block;background:rgba(61,214,140,.15);color:var(--down);
+    border:1px solid rgba(61,214,140,.4);border-radius:999px;
+    font-size:10px;padding:2px 8px;margin-left:6px;font-weight:700;
+  }
+
+  /* ═══════════ 加载 & 空态 ═══════════ */
+  .loading-panel{
+    margin-top:22px;background:var(--card);border:1px solid var(--line);
+    border-radius:var(--radius);padding:50px;text-align:center;
+  }
+  .spinner{
+    width:36px;height:36px;border-radius:50%;margin:0 auto 16px;
+    border:3px solid var(--line2);border-top-color:var(--gold);
+    animation:spin 0.9s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .loading-panel p{color:var(--text2);font-size:13px}
+  .error-panel{
+    margin-top:22px;background:rgba(255,93,93,.06);border:1px solid rgba(255,93,93,.3);
+    border-radius:var(--radius);padding:30px;text-align:center;color:var(--up);font-size:14px;
+  }
+  .hero-empty{
+    margin-top:80px;text-align:center;color:var(--text3);
+  }
+  .hero-empty .big{font-size:64px;margin-bottom:16px;opacity:.5}
+  .hero-empty h1{font-size:26px;color:var(--text);margin-bottom:10px;letter-spacing:2px}
+  .hero-empty p{font-size:14px;line-height:1.8}
+
+  /* ═══════════ 页脚 ═══════════ */
+  .footer{margin:40px 0 24px;text-align:center;color:var(--text3);font-size:11px;letter-spacing:1px}
+
+  /* ═══════════ 响应式 ═══════════ */
+  @media(max-width:900px){
+    .kpi-row{grid-template-columns:repeat(3,1fr)}
+    .chart-grid{grid-template-columns:1fr}
+    .hero-card{grid-template-columns:140px 1fr;padding:20px}
+    .hero-price .num{font-size:30px}
+  }
+  @media(max-width:640px){
+    .wrap{padding:0 12px}
+    .logo span{display:none}
+    .theme-btn{padding:9px 11px;flex:none}
+    .search-box{min-width:0}
+    .search-box input{min-width:0}
+    .kpi-row{grid-template-columns:repeat(2,1fr);gap:8px}
+    .hero-card{grid-template-columns:1fr;padding:16px}
+    .hero-img-wrap{max-width:180px;margin:0 auto}
+    .hero-price{text-align:left;flex-direction:row;align-items:baseline;gap:10px;min-width:0}
+    .hero-price .num{font-size:26px}
+    .search-btn{padding:10px 14px;min-height:40px}
+    /* 手机端报价表压缩列 */
+    .offer-table th:nth-child(2),.offer-table td:nth-child(2){display:none}
+    .offer-table th:nth-child(6),.offer-table td:nth-child(6){display:none}
+    .offer-table td,.offer-table th{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .offer-detail{white-space:normal}
+    .go-btn{padding:6px 10px;font-size:11px}
+    .panel{padding:14px}
+    .hero-title{font-size:18px}
+    .chart-grid{grid-template-columns:1fr}
   }
 </style>
 </head>
 <body>
 <div id="app" v-cloak>
 
-  <!-- Header -->
-  <header class="header">
-    <div class="header-inner">
-      <div class="logo" @click="reset">
+  <!-- ═══════ 顶部 ═══════ -->
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <div class="logo">
         <div class="logo-mark">价</div>
-        <div>
-          <div class="logo-name">全价比价</div>
-          <div class="logo-sub">ALL PRICE</div>
-        </div>
+        <span>全价<b>比价</b></span>
       </div>
-      <div class="header-right">
-        <button class="icon-btn" @click="toggleTheme" :title="theme==='dark'?'浅色':'深色'">{{ theme==='dark' ? '☀️' : '🌙' }}</button>
+      <div class="search-box">
+        <span class="s-icon">🔍</span>
+        <input v-model="keyword" @keyup="onKeyUp" placeholder="搜索商品：品牌 + 型号，如 iPhone 15 Pro">
+        <button class="search-btn" @click="doSearch" :disabled="loading">{{ loading ? '比价中…' : '全网比价' }}</button>
+      </div>
+      <button class="theme-btn" @click="toggleTheme">{{ theme==='dark' ? '☀️' : '🌙' }}</button>
+    </div>
+    <div class="wrap" v-if="!searched">
+      <div class="hot-tags">
+        <span class="tag" v-for="t in hotKeywords" :key="t" @click="quickSearch(t)">{{ t }}</span>
       </div>
     </div>
   </header>
 
-  <!-- Hero Search -->
-  <section class="hero" v-if="!searched">
-    <h1>搜全网 · 比全价</h1>
-    <p class="slogan">一个商品，全网所有平台最低到手价</p>
-    <div class="search-box">
-      <input v-model="keyword" @keyup.enter="doSearch" placeholder="输入商品名称，如：iPhone 15 Pro 256G" />
-      <button class="search-btn" @click="doSearch" :disabled="loading || !keyword.trim()">{{ loading ? '搜索中…' : '比价' }}</button>
-    </div>
-    <div class="hot-tags">
-      <span class="hot-tag" v-for="t in hotKeywords" :key="t" @click="keyword=t;doSearch()">{{ t }}</span>
-    </div>
-  </section>
+  <main class="wrap">
 
-  <!-- Main -->
-  <main class="main" v-else>
-    <!-- Loading -->
-    <div class="searching" v-if="loading">
+    <!-- ═══════ 初始状态 ═══════ -->
+    <div class="hero-empty" v-if="!searched && !loading">
+      <div class="big">🛒</div>
+      <h1>一个商品 · 全网所有平台比价</h1>
+      <p>京东 / 淘宝 / 拼多多实时报价 · 优惠叠加计算到手价<br>90 天历史走势 · AI 智能购买建议</p>
+    </div>
+
+    <!-- ═══════ 加载 ═══════ -->
+    <div class="loading-panel" v-if="loading">
       <div class="spinner"></div>
-      <p>正在全网抓取价格…</p>
-      <div class="search-status">{{ loadingStatus }}</div>
+      <p>正在全网搜索「{{ keyword }}」…</p>
     </div>
 
-    <!-- Results -->
-    <template v-else>
-      <div class="result-head">
-        <span class="kw">「{{ keyword }}」</span>
-        <span class="cnt">共找到 {{ products.length }} 款商品 · {{ totalOffers }} 个平台报价</span>
-      </div>
-      <div class="result-meta">
-        <span class="src" v-for="(s,i) in sourceStatus" :key="i">
-          <span class="src-dot" :class="{off:!s.ok}"></span>{{ s.label }}{{ s.ok ? '' : '·暂不可用' }}
-        </span>
-        <span>更新于 {{ updatedAt }}</span>
-      </div>
+    <!-- ═══════ 错误 ═══════ -->
+    <div class="error-panel" v-if="errorMsg">{{ errorMsg }}</div>
 
-      <!-- AI 综合推荐 -->
-      <div class="ai-card" v-if="bestProduct">
-        <div class="ai-icon">智</div>
-        <div class="ai-body">
-          <div class="ai-title">AI 综合推荐</div>
-          <div class="ai-text" v-html="aiRecommendText"></div>
+    <!-- ═══════ 看板（搜索后） ═══════ -->
+    <template v-if="searched && !loading && products.length">
+
+      <!-- 商品概览 -->
+      <section class="hero-card" v-for="(p,i) in products" :key="p.sku_fingerprint">
+        <div class="hero-img-wrap">
+          <img class="hero-img" :src="p.image_url || fallbackImg" :alt="p.name" loading="lazy">
         </div>
-      </div>
+        <div class="hero-info">
+          <div class="hero-top">
+            <span class="brand-badge">{{ p.brand || '品牌' }}</span>
+            <span class="stars" v-if="p.rating">★ {{ p.rating }}</span>
+            <span v-if="p.review_count">{{ fmtCount(p.review_count) }} 条评价</span>
+          </div>
+          <h2 class="hero-title">{{ p.name }}</h2>
+          <div class="hero-slogan" v-if="p.ad_slogan">「 {{ p.ad_slogan }} 」</div>
+          <p class="hero-desc" v-if="p.description">{{ p.description }}</p>
+          <div class="spec-chips" v-if="specChipsOf(p).length">
+            <span class="chip" v-for="(v,k) in specChipsOf(p)" :key="k"><b>{{ k }}</b> {{ v }}</span>
+          </div>
+          <div class="hero-meta">
+            <span>📦 {{ p.offer_count }} 个平台在售</span>
+            <span v-if="p.lowest_90d">📉 90天最低 ¥{{ fmt(p.lowest_90d) }}</span>
+          </div>
+        </div>
+        <div class="hero-price">
+          <span class="label">全网最低到手价</span>
+          <span class="num">¥{{ fmt(p.best_price) }}</span>
+          <span class="platform">{{ p.best_platform_label }} · 已含优惠</span>
+        </div>
+      </section>
 
-      <!-- Product Cards -->
-      <div class="product-card" v-for="(p,i) in products" :key="p.sku_fingerprint">
-        <div class="pc-top">
-          <div class="pc-thumb"><span v-if="!p.image_url">{{ emojiFor(i) }}</span><img v-else :src="p.image_url" /></div>
-          <div class="pc-info">
-            <div class="pc-title">{{ p.name }}</div>
-            <div class="pc-specs">
-              <span class="spec-pill" v-for="(v,k) in p.specs" :key="k">{{ k }}:{{ v }}</span>
-            </div>
-            <div class="pc-best">
-              <span class="best-price"><span class="cur">¥</span>{{ fmt(p.best_price) }}</span>
-              <span class="best-label">{{ p.best_platform_label }}最低</span>
-              <span class="best-save" v-if="bestSaveOf(p) > 0">比标价省 ¥{{ fmt(bestSaveOf(p)) }}</span>
+      <!-- KPI 指标条 -->
+      <section class="kpi-row">
+        <div class="kpi accent"><div class="k-label">最低到手价</div><div class="k-value">¥{{ fmt(bestOf(products[0]).best_price) }}</div><div class="k-sub">{{ bestOf(products[0]).best_platform_label }}</div></div>
+        <div class="kpi"><div class="k-label">平台均价</div><div class="k-value">¥{{ fmt(bestOf(products[0]).price_stats.avg) }}</div><div class="k-sub">3 平台综合</div></div>
+        <div class="kpi"><div class="k-label">最高报价</div><div class="k-value">¥{{ fmt(bestOf(products[0]).price_stats.high) }}</div><div class="k-sub">价差 ¥{{ fmt(priceGapOf(bestOf(products[0]))) }}</div></div>
+        <div class="kpi"><div class="k-label">优惠节省</div><div class="k-value" style="color:var(--down)">¥{{ fmt(bestOf(products[0]).price_stats.savings) }}</div><div class="k-sub">叠加后已省</div></div>
+        <div class="kpi"><div class="k-label">历史最低</div><div class="k-value">¥{{ fmt(bestOf(products[0]).lowest_90d || bestOf(products[0]).best_price) }}</div><div class="k-sub">90 天窗口</div></div>
+        <div class="kpi"><div class="k-label">评分</div><div class="k-value">{{ bestOf(products[0]).rating || '—' }}</div><div class="k-sub">{{ fmtCount(bestOf(products[0]).review_count) }} 评价</div></div>
+      </section>
+
+      <!-- 图表区 -->
+      <section class="chart-grid">
+        <div class="panel">
+          <div class="panel-head">
+            <div class="panel-title"><span class="dot"></span>90 天价格走势</div>
+            <span class="panel-sub">全网最低到手价</span>
+          </div>
+          <svg class="chart-svg" viewBox="0 0 520 220" preserveAspectRatio="none">
+            <line v-for="(gy,g) in trendGridY" :key="'gy'+g" :x1="0" :x2="trendW" :y1="gy" :y2="gy" stroke="var(--line)" stroke-width="1"/>
+            <text v-for="(gl,g) in trendGridLabels" :key="'gl'+g" :x="0" :y="trendGridY[g]-4" fill="var(--text3)" font-size="9">{{ gl }}</text>
+            <polyline v-for="(s,si) in trendSeries" :key="'s'+si" :points="s.points" fill="none" :stroke="s.color" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" opacity="0.95"/>
+            <circle v-for="(pt,pi) in trendSeries[0] ? trendSeries[0].pts : []" :key="'pt'+pi" :cx="pt.x" :cy="pt.y" r="2.5" fill="#fff" stroke="#d4af37" stroke-width="1.5"/>
+          </svg>
+          <div class="legend">
+            <span class="legend-item" v-for="(s,si) in trendLegend" :key="'lg'+si"><i :style="{background:s.color}"></i>{{ s.label }}</span>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div class="panel-title"><span class="dot"></span>平台到手价对比</div>
+            <span class="panel-sub">最低价高亮</span>
+          </div>
+          <svg class="chart-svg" viewBox="0 0 520 200" preserveAspectRatio="none">
+            <text v-for="(b,bi) in barData" :key="'bl'+bi" :x="0" :y="b.y+4" fill="var(--text2)" font-size="11">{{ b.label }}</text>
+            <rect v-for="(b,bi) in barData" :key="'br'+bi" :x="58" :y="b.y-10" :width="b.w" height="20" rx="5"
+                  :fill="b.isBest ? 'url(#barGold)' : 'var(--card2)'" :stroke="b.isBest ? 'rgba(212,175,55,.6)' : 'var(--line2)'" stroke-width="1"/>
+            <text v-for="(b,bi) in barData" :key="'bv'+bi" :x="b.w+64" :y="b.y+4" fill="#fff" font-size="11" font-weight="700">¥{{ fmt(b.price) }}</text>
+            <defs><linearGradient id="barGold" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#d4af37"/><stop offset="1" stop-color="#8a5a12"/>
+            </linearGradient></defs>
+          </svg>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div class="panel-title"><span class="dot"></span>价格构成分析</div>
+            <span class="panel-sub">标价 → 优惠 → 到手</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+            <svg class="chart-svg" viewBox="0 0 180 180" style="width:180px;flex:none">
+              <circle cx="90" cy="90" r="62" fill="none" stroke="var(--card2)" stroke-width="26"/>
+              <circle cx="90" cy="90" r="62" fill="none" stroke="#d4af37" stroke-width="26"
+                      :stroke-dasharray="donutBest.dash" :stroke-dashoffset="donutBest.offset"
+                      transform="rotate(-90 90 90)" stroke-linecap="butt"/>
+              <text x="90" y="86" text-anchor="middle" fill="#fff" font-size="20" font-weight="800">¥{{ fmt(bestOf(products[0]).best_price) }}</text>
+              <text x="90" y="104" text-anchor="middle" fill="var(--text3)" font-size="10">最低到手</text>
+            </svg>
+            <div style="flex:1;min-width:200px">
+              <div class="legend" style="flex-direction:column;gap:10px">
+                <span class="legend-item"><i style="background:var(--line2)"></i>平台标价 ¥{{ fmt(bestOf(products[0]).offers[0].list_price) }}</span>
+                <span class="legend-item"><i style="background:var(--down)"></i>优惠叠加 −¥{{ fmt(bestOf(products[0]).price_stats.savings) }}</span>
+                <span class="legend-item"><i style="background:var(--gold)"></i>到手价 ¥{{ fmt(bestOf(products[0]).best_price) }}</span>
+              </div>
+              <p style="color:var(--text3);font-size:11px;margin-top:10px;line-height:1.6">{{ bestOf(products[0]).offers[0].price_detail }}</p>
             </div>
           </div>
         </div>
-        <button class="pc-toggle" :class="{open:expanded[i]}" @click="toggleExpand(i)">
-          查看 {{ p.offers.length }} 个平台报价与优惠 <span class="arrow">▾</span>
-        </button>
-        <div v-show="expanded[i]">
+
+        <div class="panel">
+          <div class="panel-head">
+            <div class="panel-title"><span class="dot"></span>价格区间分布</div>
+            <span class="panel-sub">90 天走势价格带</span>
+          </div>
+          <svg class="chart-svg" viewBox="0 0 520 200" preserveAspectRatio="none">
+            <rect v-for="(h,hi) in histData" :key="'h'+hi" :x="h.x" :y="h.y" :width="h.w" :height="h.h" rx="3"
+                  :fill="h.isCurrent ? '#d4af37' : 'rgba(77,159,255,.35)'"/>
+            <text v-for="(hl,hi) in histLabels" :key="'hl'+hi" :x="hl.x" :y="histBase+4" fill="var(--text3)" font-size="9" text-anchor="middle">{{ hl.label }}</text>
+          </svg>
+        </div>
+      </section>
+
+      <!-- AI 智能推荐 -->
+      <section class="ai-panel" v-if="bestOf(products[0]).recommendation">
+        <div class="ai-head">
+          <span class="ai-badge">AI 智选</span>
+          <span class="ai-label">{{ bestOf(products[0]).recommend_source === 'ai' ? 'DeepSeek V4 Flash 分析' : '智能规则推荐' }}</span>
+        </div>
+        <div class="ai-body" v-html="bestOf(products[0]).recommendation"></div>
+      </section>
+
+      <!-- 规格参数 + 报价明细 -->
+      <section class="chart-grid" style="margin-top:14px">
+        <div class="panel">
+          <div class="panel-head">
+            <div class="panel-title"><span class="dot"></span>规格参数</div>
+            <span class="panel-sub">{{ bestOf(products[0]).specs.length || Object.keys(bestOf(products[0]).specs).length }} 项</span>
+          </div>
+          <table class="spec-table">
+            <tr v-for="(v,k) in bestOf(products[0]).specs" :key="k">
+              <td>{{ k }}</td><td>{{ v }}</td>
+            </tr>
+          </table>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <div class="panel-title"><span class="dot"></span>平台报价明细</div>
+            <span class="panel-sub">{{ bestOf(products[0]).offers.length }} 个平台 · 按到手价排序</span>
+          </div>
           <table class="offer-table">
-            <thead>
-              <tr><th>平台</th><th>售价</th><th>优惠后到手价</th><th>优惠明细</th><th></th></tr>
-            </thead>
+            <thead><tr>
+              <th>平台</th><th>店铺</th><th>标价</th><th>优惠</th><th>到手价</th><th>销量</th><th></th>
+            </tr></thead>
             <tbody>
-              <tr v-for="o in p.offers" :key="o.platform" :class="{'offer-lowest': o.final_price===p.best_price}">
-                <td><div class="plat"><span class="plat-badge" :class="'plat-'+o.platform">{{ o.platform_label[0] }}</span>{{ o.platform_label }}<span class="lowest-badge" v-if="o.final_price===p.best_price">最低</span></div></td>
-                <td><span class="offer-price">¥{{ fmt(o.sale_price) }}</span><span class="offer-sale">¥{{ fmt(o.list_price) }}</span></td>
+              <tr v-for="(o,oi) in sortedOffersOf(bestOf(products[0]))" :key="oi" :class="{'row-lowest': o.final_price===bestOf(products[0]).best_price}">
+                <td>
+                  <span class="plat-badge"><span class="plat-dot" :style="{background:platColorOf(o.platform)}"></span>{{ o.platform_label }}</span>
+                  <span class="lowest-flag" v-if="o.final_price===bestOf(products[0]).best_price">最低</span>
+                </td>
+                <td style="color:var(--text2)">{{ o.shop_name || '—' }}</td>
+                <td style="color:var(--text3);text-decoration:line-through">¥{{ fmt(o.list_price) }}</td>
+                <td>
+                  <div style="color:var(--down);font-size:12px;font-weight:600">−¥{{ fmt(o.list_price - o.final_price) }}</div>
+                  <div class="offer-detail">{{ o.price_detail }}</div>
+                </td>
                 <td><span class="offer-final">¥{{ fmt(o.final_price) }}</span></td>
-                <td><div class="offer-detail">{{ o.price_detail || '—' }}</div></td>
-                <td><a :href="o.url" target="_blank" rel="noopener"><button class="offer-buy">去购买</button></a></td>
+                <td class="offer-sales">{{ o.sales || '—' }}</td>
+                <td><a class="go-btn" :href="o.url" target="_blank" rel="noopener">去购买 →</a></td>
               </tr>
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
 
-      <!-- 走势图 -->
-      <div class="trend-card" v-if="bestProduct">
-        <div class="trend-head">
-          <div class="trend-title">📈 历史价格走势（{{ bestProduct.name }}）</div>
-          <div class="trend-sub">90 天 · 各平台最低到手价（模拟走势，接入真实数据源后自动更新）</div>
+      <!-- 更多商品 -->
+      <section v-if="products.length > 1" style="margin-top:22px">
+        <div class="panel-head" style="padding:0 4px">
+          <div class="panel-title"><span class="dot"></span>同关键词 · 其他商品</div>
         </div>
-        <svg class="trend-svg" :viewBox="trendViewBox" preserveAspectRatio="none" role="img" aria-label="90天价格走势图">
-          <defs>
-            <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="var(--accent)" stop-opacity=".18"/>
-              <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>
-            </linearGradient>
-          </defs>
-          <g v-for="(line,li) in trendLines" :key="li">
-            <path :d="line.area" fill="url(#trendFill)" stroke="none"/>
-            <path :d="line.path" fill="none" :stroke="line.color" stroke-width="2" stroke-linejoin="round"/>
-          </g>
-        </svg>
-        <div class="trend-legend">
-          <span v-for="(line,li) in trendLines" :key="'l'+li" class="legend-item">
-            <i :style="{background:line.color}"></i>{{ line.name }}
-          </span>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:10px">
+          <div v-for="(p,i) in products.slice(1)" :key="p.sku_fingerprint"
+               style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;gap:12px;align-items:center;cursor:pointer;transition:all .2s"
+               @click="scrollTo(i+1)">
+            <img :src="p.image_url || fallbackImg" style="width:56px;height:56px;border-radius:8px;object-fit:cover;flex:none" alt="">
+            <div style="min-width:0">
+              <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</div>
+              <div style="font-size:12px;color:var(--gold2);font-weight:700;margin-top:4px">¥{{ fmt(p.best_price) }}</div>
+              <div style="font-size:11px;color:var(--text3)">{{ p.best_platform_label }}</div>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
-      <!-- Empty -->
-      <div class="empty" v-if="!loading && products.length===0">
-        <div class="empty-icon">🔍</div>
-        <h3>未找到相关商品</h3>
-        <p>{{ errorMsg || '试试更精确的关键词，如「品牌+型号」' }}</p>
-      </div>
     </template>
+
+    <!-- 空结果 -->
+    <div class="error-panel" v-if="searched && !loading && !products.length">
+      {{ emptyMsg || '未找到该商品，试试更精确的关键词' }}
+    </div>
+
   </main>
 
-  <!-- Footer -->
-  <footer class="footer">
-    全价比价 · 数据仅供参考，实际价格以各平台结算为准 · 价格抓取于 {{ updatedAt }}
-  </footer>
+  <footer class="footer">全价比价 · 数据仅供参考 · 以平台实时价格为准</footer>
 
-  <div class="toast" :class="{show:toast.show}">{{ toast.msg }}</div>
 </div>
 
 <script>
-const { createApp, ref, computed, onMounted, nextTick } = Vue;
-const API = location.origin + '/api';
-const HOT = ['iPhone 15 Pro', '华为 Mate 60 Pro', '小米14 Pro', '索尼 WH-1000XM5', '戴森 V15'];
+const { createApp, ref, computed } = Vue;
 
 createApp({
-  setup() {
+  setup(){
+    const HOT = ['iPhone 15 Pro','华为 Mate 60 Pro','小米 14 Pro','索尼 WH-1000XM5','戴森 V15','MacBook Air'];
+    const PLAT_COLORS = { jd:'#e8380d', taobao:'#ff5000', pdd:'#e02e24', mock:'#8b7cf6', xianyu:'#fcee21' };
+
     const keyword = ref('');
     const products = ref([]);
     const searched = ref(false);
     const loading = ref(false);
-    const loadingStatus = ref('');
     const errorMsg = ref('');
-    const expanded = ref({});
-    const sourceStatus = ref([]);
-    const updatedAt = ref('');
-    const theme = ref(localStorage.getItem('allprice_theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+    const emptyMsg = ref('');
+    const theme = ref(localStorage.getItem('allprice_theme') || 'dark');
     const hotKeywords = HOT;
-    const toast = ref({show:false, msg:''});
+    // 纯 ASCII 内嵌 SVG（btoa 不支持非 Latin1 字符）
+    const fallbackImg = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#1a2131"/><text x="100" y="115" font-size="60" text-anchor="middle" fill="#5c6a85">$</text></svg>');
 
-    const totalOffers = computed(() => products.value.reduce((s,p)=>s+p.offers.length,0));
-    const bestProduct = computed(() => products.value[0] || null);
-
-    // ── SVG 走势图（零依赖，任何环境可渲染） ──
-    const TREND_COLORS = ['#c0392b','#2f6fed','#1e9e5a','#b8860b','#7c5cff'];
-    const trendViewBox = '0 0 600 240';
-    const trendLines = computed(() => {
-      const p = bestProduct.value;
-      if(!p) return [];
-      const platforms = [...new Set(p.offers.map(o=>o.platform_label))];
-      const days = 90;
-      return platforms.map((label, pi) => {
-        const base = p.best_price || 100;
-        const pts = [];
-        let v = base * 0.96;
-        for(let i=0;i<=days;i++){
-          v = Math.max(base*0.9, v * (0.9995 + Math.random()*0.0012));
-          pts.push(v);
-        }
-        // 归一化到 SVG 坐标
-        const min = Math.min(...pts), max = Math.max(...pts);
-        const span = (max-min) || 1;
-        const W = 600, H = 220, pad = 12;
-        const step = (W - pad*2) / days;
-        const path = pts.map((val,i)=>{
-          const x = pad + i*step;
-          const y = pad + (H - pad*2) * (1 - (val-min)/span);
-          return (i===0?'M':'L') + x.toFixed(1) + ' ' + y.toFixed(1);
-        }).join(' ');
-        const last = pts[pts.length-1];
-        const lastY = pad + (H - pad*2) * (1 - (last-min)/span);
-        const area = path + ` L${pad+days*step} ${H-pad} L${pad} ${H-pad} Z`;
-        return { name:label, color:TREND_COLORS[pi%TREND_COLORS.length], path, area };
-      });
-    });
-
-    function fmt(n){ return n===null||n===undefined ? '—' : Number(n).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
-    function listPriceOf(p){ const o=p.offers[0]; return o ? o.list_price : p.best_price; }
-    function bestSaveOf(p){ const save = listPriceOf(p) - p.best_price; return save > 0 ? save : 0; }
-    function emojiFor(i){ return ['📱','🎧','⌚','💻','📷','🎮'][i%6]; }
-
-    const aiRecommendText = computed(() => {
-      const p = bestProduct.value;
-      if(!p) return '';
-      // 优先用后端推荐（真实 AI 或后端规则引擎），失败再用本地兜底
-      if(p.recommendation) return p.recommendation.replace(/\n/g,'<br>');
-      const best = p.offers.find(o=>o.final_price===p.best_price);
-      if(!best) return '';
-      const otherCount = p.offers.length - 1;
-      let t = `<b>推荐：${best.platform_label} ¥${fmt(p.best_price)}</b>`;
-      t += ` 为全网最低到手价。`;
-      if(otherCount>0) t += ` 比其他 ${otherCount} 个平台最低可再省 ¥${fmt(p.offers[1] ? p.offers[1].final_price - p.best_price : 0)}。`;
-      t += ` 该价格已包含${best.price_detail ? '优惠叠加' : '当前活动价'}。`;
-      t += ` 建议关注大促节点价格波动，历史低位时可果断入手。`;
-      return t;
-    });
-
-    function toggleTheme(){
-      theme.value = theme.value==='dark' ? 'light' : 'dark';
-      localStorage.setItem('allprice_theme', theme.value);
-      document.documentElement.setAttribute('data-theme', theme.value);
+    // ── 工具 ──
+    function fmt(n){
+      if(n===null||n===undefined||isNaN(n)) return '—';
+      return Number(n).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});
     }
-    function toggleExpand(i){ expanded.value[i] = !expanded.value[i]; }
-    function reset(){ searched.value=false; products.value=[]; keyword.value=''; }
-    function showToast(msg){ toast.value={show:true,msg}; setTimeout(()=>toast.value.show=false, 2200); }
+    function fmtCount(n){
+      if(!n) return '';
+      return n>=10000 ? (n/10000).toFixed(1)+'万' : n;
+    }
+    function bestOf(p){ return p || {best_price:null,price_stats:{avg:0,high:0,low:0,savings:0},offers:[]}; }
+    function specChipsOf(p){
+      const s = p.specs || {};
+      const keys = ['品牌','型号','颜色','存储容量','内存','屏幕','芯片','摄像头','电池','重量','续航'];
+      const out = {};
+      for(const k of keys){ if(s[k] !== undefined && s[k] !== '') out[k]=s[k]; }
+      return out;
+    }
+    function sortedOffersOf(p){
+      return [...(p.offers||[])].sort((a,b)=>a.final_price-b.final_price);
+    }
+    function platColorOf(plat){ return PLAT_COLORS[plat] || '#8b7cf6'; }
+    function priceGapOf(p){ return (p.price_stats.high||0) - (p.price_stats.low||0); }
 
+    // ── 搜索 ──
     async function doSearch(){
       const kw = keyword.value.trim();
       if(!kw || loading.value) return;
-      loading.value = true;
-      searched.value = true;
-      errorMsg.value = '';
+      loading.value = true; errorMsg.value=''; emptyMsg.value='';
       products.value = [];
-      loadingStatus.value = '正在搜索京东、淘宝、拼多多…';
-      const phases = ['正在抓取京东报价…','正在抓取淘宝报价…','正在抓取拼多多报价…','正在计算优惠叠加…'];
-      const timer = setInterval(()=>{ loadingStatus.value = phases[Math.floor(Math.random()*phases.length)]; }, 1400);
       try{
-        const r = await fetch(`${API}/search?keyword=${encodeURIComponent(kw)}`);
+        const r = await fetch('/api/search?keyword='+encodeURIComponent(kw)+'&limit=6', {signal: AbortSignal.timeout(30000)});
         const d = await r.json();
-        clearInterval(timer);
-        products.value = d.products || [];
-        sourceStatus.value = Object.entries(d.source_status||{}).map(([k,ok])=>({
-          label: ({jd:'京东',taobao:'淘宝',pdd:'拼多多',mock:'演示'})[k]||k, ok
-        }));
-        updatedAt.value = new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
-        if(d.message && !products.value.length) errorMsg.value = d.message;
-        if(products.value.length) showToast(`找到 ${products.value.length} 款商品`);
-        expanded.value = products.value.reduce((a,_,i)=>(a[i]=i===0,a),{});
+        if(!r.ok) throw new Error(d.detail || '请求失败');
+        if(d.products && d.products.length){
+          products.value = d.products;
+          searched.value = true;
+        }else{
+          searched.value = true;
+          emptyMsg.value = d.message || '未找到该商品，试试更精确的关键词';
+        }
       }catch(e){
-        clearInterval(timer);
-        errorMsg.value = '网络错误，请稍后重试';
+        errorMsg.value = '网络错误或服务超时，请稍后重试';
         console.error(e);
       }finally{
         loading.value = false;
       }
     }
-
-    onMounted(()=>{
+    function quickSearch(t){ keyword.value = t; doSearch(); }
+    function onKeyUp(e){ if(e.key === 'Enter') doSearch(); }
+    function scrollTo(i){
+      const cards = document.querySelectorAll('.hero-card');
+      if(cards[i]) cards[i].scrollIntoView({behavior:'smooth', block:'start'});
+    }
+    function toggleTheme(){
+      theme.value = theme.value==='dark' ? 'light' : 'dark';
+      localStorage.setItem('allprice_theme', theme.value);
       document.documentElement.setAttribute('data-theme', theme.value);
+      location.reload();
+    }
+
+    // ── 图表：90天走势 ──
+    const trendW = 520, trendH = 220;
+    const trendSeries = computed(() => {
+      const p = bestOf(products.value[0]);
+      const hist = p.history || [];
+      if(!hist.length) return [];
+      // 每平台一条线（取各平台报价做基准色；数据点只有全网最低时画一条）
+      const min = Math.min(...hist.map(h=>h.price));
+      const max = Math.max(...hist.map(h=>h.price));
+      const pad = (max-min)*0.12 || max*0.02;
+      const lo = min-pad, hi = max+pad;
+      const x = i => i/(hist.length-1)*(trendW-40)+10;
+      const y = v => trendH-20 - (v-lo)/(hi-lo)*(trendH-44);
+      const pts = hist.map((h,i)=>({x:x(i), y:y(h.price), price:h.price}));
+      return [{
+        color:'#d4af37',
+        points: pts.map(pt=>`${pt.x},${pt.y}`).join(' '),
+        pts
+      }];
+    });
+    const trendGridY = computed(()=>{
+      const p = bestOf(products.value[0]);
+      const hist = p.history || [];
+      if(!hist.length) return [20,70,120,170,200];
+      const min = Math.min(...hist.map(h=>h.price));
+      const max = Math.max(...hist.map(h=>h.price));
+      const pad = (max-min)*0.12 || max*0.02;
+      const lo = min-pad, hi = max+pad;
+      return [0,1,2,3,4].map(i=> 20 + i*(trendH-44)/4);
+    });
+    const trendGridLabels = computed(()=>{
+      const p = bestOf(products.value[0]);
+      const hist = p.history || [];
+      if(!hist.length) return [];
+      const min = Math.min(...hist.map(h=>h.price));
+      const max = Math.max(...hist.map(h=>h.price));
+      const pad = (max-min)*0.12 || max*0.02;
+      const lo = min-pad, hi = max+pad;
+      return [0,1,2,3,4].map(i=>{
+        const v = hi - (hi-lo)*i/4;
+        return '¥'+Math.round(v);
+      });
+    });
+    const trendLegend = computed(()=>{
+      const p = bestOf(products.value[0]);
+      const labels = (p.offers||[]).map(o=>o.platform_label);
+      const uniq = [...new Set(labels)];
+      return [{label:'全网最低到手价（'+ (uniq.join('/')||'全网') +'）', color:'#d4af37'}];
     });
 
-    return { keyword, products, searched, loading, loadingStatus, errorMsg, expanded, sourceStatus, updatedAt,
-             theme, hotKeywords, trendLines, trendViewBox, totalOffers, bestProduct, aiRecommendText, toast,
-             fmt, listPriceOf, bestSaveOf, emojiFor, toggleTheme, toggleExpand, reset, doSearch };
+    // ── 图表：平台对比条形图 ──
+    const barW = 520, barH = 200;
+    const barData = computed(()=>{
+      const p = bestOf(products.value[0]);
+      const offers = sortedOffersOf(p);
+      const maxP = Math.max(...offers.map(o=>o.list_price||o.final_price), 1);
+      const usable = barW - 90;
+      return offers.map((o,i)=>{
+        const w = Math.max(24, (o.final_price/maxP)*usable);
+        return { label:o.platform_label, price:o.final_price, w, y:24+i*44,
+                 isBest:o.final_price===p.best_price };
+      });
+    });
+
+    // ── 图表：环形图 ──
+    const donutBest = computed(()=>{
+      const p = bestOf(products.value[0]);
+      const offer = p.offers && p.offers[0];
+      const list = offer ? offer.list_price : p.best_price||0;
+      const cur = p.best_price||0;
+      const ratio = list>0 ? Math.max(0.25, cur/list) : 1;
+      const C = 2*Math.PI*62;
+      return { dash:`${C*ratio} ${C}`, offset:0 };
+    });
+
+    // ── 图表：价格区间直方图 ──
+    const histW = 520, histH = 200;
+    // 直方图 Y 基线高度（模板引用需要暴露）
+    const histBase = histH - 24;
+    const histData = computed(()=>{
+      const p = bestOf(products.value[0]);
+      const hist = p.history || [];
+      if(!hist.length) return [];
+      const bins = 10;
+      const min = Math.min(...hist.map(h=>h.price));
+      const max = Math.max(...hist.map(h=>h.price));
+      const span = (max-min)||1;
+      const counts = new Array(bins).fill(0);
+      for(const h of hist){
+        const bi = Math.min(bins-1, Math.floor((h.price-min)/span*bins));
+        counts[bi]++;
+      }
+      const cMax = Math.max(...counts, 1);
+      const bw = (histW-30)/bins;
+      const cur = p.best_price||0;
+      return counts.map((c,i)=>{
+        const x = 14+i*bw;
+        const h = (c/cMax)*(histH-40);
+        return { x, y: histH-24-h, w: bw-4, h,
+                 isCurrent: cur>=min+i*span/bins && cur<=min+(i+1)*span/bins };
+      });
+    });
+    const histLabels = computed(()=>{
+      const p = bestOf(products.value[0]);
+      const hist = p.history || [];
+      if(!hist.length) return [];
+      const min = Math.min(...hist.map(h=>h.price));
+      const max = Math.max(...hist.map(h=>h.price));
+      const bins = 10, bw = (histW-30)/bins;
+      return [0, 5, 9].map(i=>({ x:14+i*bw+bw/2, label:'¥'+Math.round(min+(max-min)*i/9) }));
+    });
+
+    document.documentElement.setAttribute('data-theme', theme.value);
+
+    return { keyword, products, searched, loading, errorMsg, emptyMsg, theme,
+             hotKeywords, fallbackImg,
+             fmt, fmtCount, bestOf, specChipsOf, sortedOffersOf, platColorOf, priceGapOf,
+             doSearch, quickSearch, onKeyUp, scrollTo, toggleTheme,
+             trendSeries, trendGridY, trendGridLabels, trendLegend,
+             barData, donutBest,
+             histData, histLabels, histBase };
   }
 }).mount('#app');
 </script>

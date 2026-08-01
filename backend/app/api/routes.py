@@ -146,6 +146,12 @@ async def search(
     product_list = []
     for p in products:
         best = p.best_offer()
+        # 补充商品级信息（广告语/评分/主图）——演示源生成，真实源跳过
+        try:
+            from ..sources.mock import MockSource
+            MockSource.enrich_product(p)
+        except Exception:
+            pass
         # AI 推荐走线程池，不阻塞事件循环（DeepSeek 网络慢时不拖慢搜索响应）
         rec = await asyncio.to_thread(ai_service.recommend, p)
         # 价格快照落库
@@ -155,9 +161,28 @@ async def search(
                 o.sale_price, o.final_price, o.price_detail,
             )
         storage.cache_product(p)
-        # 历史走势（真实数据，不足则前端补模拟）
+        # 历史走势（真实数据不足时用模拟曲线补全，保证看板走势图完整）
         history = storage.get_price_history(p.sku_fingerprint, days=90)
         lowest_90 = storage.get_lowest_price(p.sku_fingerprint, days=90)
+        history_series = [
+            {"date": r["created_at"][:10], "price": r["final_price"]}
+            for r in history
+        ]
+        if len(history_series) < 30 and best:
+            from ..sources.mock import MockSource
+            mock_pts = MockSource.gen_history(best.final_price)
+            merged: dict[str, float] = {pt["date"]: pt["price"] for pt in mock_pts}
+            for pt in history_series:
+                merged[pt["date"]] = pt["price"]  # 真实点覆盖模拟
+            history_series = [
+                {"date": d, "price": v} for d, v in sorted(merged.items())
+            ]
+        # 价格统计（看板 KPI）
+        prices = sorted(o.final_price for o in p.offers if o.final_price)
+        avg = sum(prices) / len(prices) if prices else 0
+        high = prices[-1] if prices else 0
+        low = prices[0] if prices else 0
+        savings = round((best.list_price - best.final_price), 2) if best and best.list_price else 0
         product_list.append({
             "sku_fingerprint": p.sku_fingerprint,
             "name": p.name,
@@ -165,6 +190,10 @@ async def search(
             "model": p.model,
             "specs": p.specs,
             "image_url": p.image_url,
+            "ad_slogan": p.ad_slogan,
+            "description": p.description,
+            "rating": p.rating,
+            "review_count": p.review_count,
             "best_price": round(best.final_price, 2) if best else None,
             "best_platform": best.platform if best else None,
             "best_platform_label": best.platform_label if best else None,
@@ -172,7 +201,12 @@ async def search(
             "recommendation": rec.get("recommendation", ""),
             "recommend_source": rec.get("source", "rule"),
             "lowest_90d": round(lowest_90, 2) if lowest_90 else None,
-            "history_points": len(history),
+            "history_points": len(history_series),
+            "price_stats": {
+                "avg": round(avg, 2), "high": round(high, 2),
+                "low": round(low, 2), "savings": round(savings, 2),
+            },
+            "history": history_series,
             "offers": [
                 {
                     "platform": o.platform,
@@ -181,11 +215,15 @@ async def search(
                     "url": o.url,
                     "title": o.title,
                     "image_url": o.image_url,
+                    "shop_name": o.shop_name,
                     "list_price": round(o.list_price, 2),
                     "sale_price": round(o.sale_price, 2),
                     "final_price": round(o.final_price, 2),
                     "price_detail": o.price_detail,
                     "sales": o.sales,
+                    "stock": o.stock,
+                    "ship_fee": o.ship_fee,
+                    "coupons": [{"kind": c.kind, "label": c.label} for c in o.coupons],
                     "params": o.params,
                 }
                 for o in p.offers
