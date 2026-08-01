@@ -221,6 +221,29 @@ class TestSearchFlow:
         assert bad == 0, f"存在 {bad} 个无优惠步骤的方案"
         page.close()
 
+    def test_brand_search_nav(self, browser):
+        """品牌词搜索：多商品导航条 + 切换联动"""
+        page = _open_page(browser, VIEWPORTS["desktop"])
+        _do_search(page, "耐克")
+        page.wait_for_selector(".prod-nav", timeout=20000)
+        items = page.query_selector_all(".pn-item")
+        assert len(items) >= 3, f"品牌词应返回至少3款商品, 实际{len(items)}"
+        # 第一款的名称/价格
+        first_name = page.inner_text(".pn-item:first-child .pn-name")
+        # 切换到第二款
+        items[1].click()
+        page.wait_for_timeout(800)
+        active = page.inner_text(".pn-active .pn-name")
+        assert active != first_name, f"导航切换未生效: {first_name} == {active}"
+        # 可见 hero 卡跟随
+        visible = page.evaluate("""() => {
+            const cards = [...document.querySelectorAll('.hero-card')]
+                .filter(h => getComputedStyle(h).display !== 'none');
+            return cards.length === 1 && cards[0].querySelector('.hero-title');
+        }""")
+        assert visible, "应恰好显示一个 hero 卡"
+        page.close()
+
 
 class TestMobileSpecific:
     def test_mobile_layout(self, browser):

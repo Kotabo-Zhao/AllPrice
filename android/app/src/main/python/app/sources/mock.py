@@ -46,10 +46,24 @@ class MockSource(BaseSource):
     TEMPLATES = [
         ("Apple", "iPhone 15 Pro", 256, ["原色钛金属", "蓝色钛金属"], 7999),
         ("Apple", "iPhone 15", 128, ["黑色", "蓝色", "粉色"], 5999),
+        ("Apple", "MacBook Air 13", 0, ["午夜色", "星光色"], 7999),
         ("华为", "Mate 60 Pro", 512, ["雅丹黑", "白沙银"], 6999),
+        ("华为", "MatePad Pro", 0, ["曜金黑", "宣白"], 4699),
+        ("华为", "FreeBuds Pro 3", 0, ["冰霜银", "雅川青"], 1499),
         ("小米", "14 Pro", 256, ["黑色", "白色", "岩石青"], 4999),
+        ("小米", "Redmi K70", 256, ["墨羽", "晴雪", "竹月蓝"], 2499),
+        ("小米", "Watch S3", 0, ["曜石黑", "象牙白"], 1099),
         ("索尼", "WH-1000XM5", 0, ["黑色", "银色"], 2899),
+        ("索尼", "WF-1000XM5", 0, ["黑色", "铂金银"], 1999),
         ("戴森", "V15 Detect", 0, ["镍色"], 4990),
+        ("耐克", "Air Force 1", 0, ["白色", "黑色", "小麦色"], 799),
+        ("耐克", "Dunk Low", 0, ["黑白", "熊猫", "灰白"], 749),
+        ("耐克", "Pegasus 41 跑鞋", 0, ["荧光绿", "黑武士", "白红"], 899),
+        ("耐克", "Air Max 270", 0, ["黑武士", "白蓝", "灰红"], 1099),
+        ("阿迪达斯", "Ultraboost 跑步鞋", 0, ["白黑", "碳灰", "荧光黄"], 999),
+        ("阿迪达斯", "三叶草贝壳头", 0, ["白黑", "白蓝", "全白"], 899),
+        ("李宁", "中国李宁 悟道", 0, ["白黑", "米白", "蓝灰"], 699),
+        ("李宁", "赤兔 7 Pro 跑鞋", 0, ["荧光绿", "黑武士"], 549),
     ]
 
     def __init__(self, seed: Optional[int] = None):
@@ -65,6 +79,9 @@ class MockSource(BaseSource):
         offers: list[PlatformOffer] = []
         matched = False
         tmpl_count = 0
+        # 品牌词（命中多个模板）应全出；具体词（命中1个模板）也保证出全
+        max_templates = max(1, limit // 6 + (1 if limit % 6 else 0))
+        max_templates = max(max_templates, 4)  # 品牌词至少展示 4 款单品
         for brand, model, cap, colors, base in self.TEMPLATES:
             if kw and kw not in (brand.lower() + model.lower()):
                 continue
@@ -88,7 +105,7 @@ class MockSource(BaseSource):
                         platform, label, title, price, list_price, params, brand,
                     ))
             tmpl_count += 1
-            if tmpl_count >= max(1, limit // 6 + (1 if limit % 6 else 0)):
+            if tmpl_count >= max_templates:
                 break
 
         # 模板未命中 → 生成基于关键词的泛化商品（保证兜底，标注演示）

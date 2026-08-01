@@ -140,6 +140,33 @@
     font-weight:700;
   }
 
+  /* ═══════════ 商品导航条 ═══════════ */
+  .prod-nav{margin-top:18px}
+  .pn-scroll{
+    display:flex;gap:10px;overflow-x:auto;padding:4px 2px 10px;
+    scrollbar-width:thin;
+  }
+  .pn-scroll::-webkit-scrollbar{height:5px}
+  .pn-scroll::-webkit-scrollbar-thumb{background:var(--line2);border-radius:3px}
+  .pn-item{
+    flex:0 0 200px;display:flex;gap:10px;align-items:center;
+    background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:10px;cursor:pointer;transition:all .2s;min-width:0;
+  }
+  .pn-item:hover{border-color:var(--line2);transform:translateY(-2px)}
+  .pn-item.pn-active{
+    border-color:var(--gold);background:rgba(212,175,55,.07);
+    box-shadow:0 0 16px rgba(212,175,55,.12);
+  }
+  .pn-img{width:52px;height:52px;border-radius:8px;object-fit:cover;flex:none}
+  .pn-info{min-width:0}
+  .pn-name{
+    font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;max-width:120px;
+  }
+  .pn-price{font-size:13px;font-weight:800;color:var(--gold2);margin-top:4px;font-variant-numeric:tabular-nums}
+  .pn-hint{color:var(--text3);font-size:11px;margin-top:2px}
+
   /* ═══════════ KPI 指标条 ═══════════ */
   .kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-top:14px}
   .kpi{
@@ -397,8 +424,24 @@
     <!-- ═══════ 看板（搜索后） ═══════ -->
     <template v-if="searched && !loading && products.length">
 
+      <!-- 商品导航条（多商品时切换看板） -->
+      <div class="prod-nav" v-if="products.length > 1">
+        <div class="pn-scroll">
+          <div v-for="(p,pi) in products" :key="p.sku_fingerprint"
+               class="pn-item" :class="{'pn-active': pi===activeProduct}"
+               @click="switchProduct(pi)">
+            <img class="pn-img" :src="p.image_url || fallbackImg" :alt="p.name" loading="lazy">
+            <div class="pn-info">
+              <div class="pn-name">{{ p.name }}</div>
+              <div class="pn-price">¥{{ fmt(p.best_price) }}</div>
+            </div>
+          </div>
+        </div>
+        <div class="pn-hint">共 {{ products.length }} 款相关商品 · 点击切换查看</div>
+      </div>
+
       <!-- 商品概览 -->
-      <section class="hero-card" v-for="(p,i) in products" :key="p.sku_fingerprint">
+      <section class="hero-card" v-for="(p,i) in products" :key="p.sku_fingerprint" v-show="i===activeProduct">
         <div class="hero-img-wrap">
           <img class="hero-img" :src="currentOf(p).image_url || fallbackImg" :alt="currentOf(p).name" loading="lazy">
         </div>
@@ -636,25 +679,6 @@
         </div>
       </section>
 
-      <!-- 更多商品 -->
-      <section v-if="products.length > 1" style="margin-top:22px">
-        <div class="panel-head" style="padding:0 4px">
-          <div class="panel-title"><span class="dot"></span>同关键词 · 其他商品</div>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:10px">
-          <div v-for="(p,i) in products.slice(1)" :key="p.sku_fingerprint"
-               style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;gap:12px;align-items:center;cursor:pointer;transition:all .2s"
-               @click="scrollTo(i+1)">
-            <img :src="p.image_url || fallbackImg" style="width:56px;height:56px;border-radius:8px;object-fit:cover;flex:none" alt="">
-            <div style="min-width:0">
-              <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</div>
-              <div style="font-size:12px;color:var(--gold2);font-weight:700;margin-top:4px">¥{{ fmt(p.best_price) }}</div>
-              <div style="font-size:11px;color:var(--text3)">{{ p.best_platform_label }}</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
     </template>
 
     <!-- 空结果 -->
@@ -700,6 +724,12 @@ createApp({
 
     // ── 多规格变体：当前激活规格 ──
     const activeVariant = ref({});  // sku_fingerprint → 变体索引
+    const activeProduct = ref(0);   // 多商品时选中的商品索引
+    function switchProduct(i){
+      activeProduct.value = i;
+      expandedOffer.value = 0;      // 切换商品后重置报价表展开
+      selectVariant(products.value[i], 0);  // 重置规格为第一个
+    }
     function allVariantsOf(p){
       const arr = [p].concat(p.variants || []);
       return arr.filter(Boolean);
@@ -734,8 +764,12 @@ createApp({
       expandedOffer.value = expandedOffer.value === i ? null : i;
     }
 
-    // 主商品（KPI/图表/报价表联动）→ 当前激活变体
-    const curMain = computed(() => currentOf(products.value[0] || {}));
+    // 主商品（KPI/图表/报价表联动）→ 选中商品的当前激活变体
+    const curMain = computed(() => {
+      const list = products.value || [];
+      const idx = activeProduct.value < list.length ? activeProduct.value : 0;
+      return currentOf(list[idx] || {});
+    });
     function specChipsOf(p){
       const s = p.specs || {};
       const keys = ['品牌','型号','颜色','存储容量','内存','屏幕','芯片','摄像头','电池','重量','续航'];
@@ -756,7 +790,7 @@ createApp({
       loading.value = true; errorMsg.value=''; emptyMsg.value='';
       products.value = [];
       try{
-        const r = await fetch('/api/search?keyword='+encodeURIComponent(kw)+'&limit=6', {signal: AbortSignal.timeout(30000)});
+        const r = await fetch('/api/search?keyword='+encodeURIComponent(kw)+'&limit=15', {signal: AbortSignal.timeout(30000)});
         const d = await r.json();
         if(!r.ok) throw new Error(d.detail || '请求失败');
         if(d.products && d.products.length){
@@ -927,6 +961,7 @@ createApp({
              hotKeywords, fallbackImg,
              fmt, fmtCount, bestOf, specChipsOf, sortedOffersOf, platColorOf, priceGapOf,
              curMain, allVariantsOf, activeIdxOf, currentOf, selectVariant, variantShortName,
+             activeProduct, switchProduct,
              doSearch, quickSearch, onKeyUp, scrollTo, toggleTheme,
              expandedOffer, expandedOfferData, toggleOfferPlan,
              socialDeals, socialLoading,
