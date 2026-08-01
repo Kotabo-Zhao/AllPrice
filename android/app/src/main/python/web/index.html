@@ -434,7 +434,7 @@
           <div v-for="(p,pi) in products" :key="p.sku_fingerprint"
                class="pn-item" :class="{'pn-active': pi===activeProduct}"
                @click="switchProduct(pi)">
-            <img class="pn-img" :src="pngOf(p.image_url)" :alt="p.name" loading="lazy">
+            <img class="pn-img" :src="realImgOf(p)" :alt="p.name" loading="lazy" referrerpolicy="no-referrer" @error="onImgErr($event, p)">
             <div class="pn-info">
               <div class="pn-name">{{ p.name }}</div>
               <div class="pn-price">¥{{ fmt(p.best_price) }}</div>
@@ -447,7 +447,7 @@
       <!-- 商品概览 -->
       <section class="hero-card" v-for="(p,i) in products" :key="p.sku_fingerprint" v-show="i===activeProduct">
         <div class="hero-img-wrap">
-          <img class="hero-img" :src="pngOf(currentOf(p).image_url)" :alt="currentOf(p).name" loading="lazy">
+          <img class="hero-img" :src="realImgOf(currentOf(p))" :alt="currentOf(p).name" loading="lazy" referrerpolicy="no-referrer" @error="onImgErr($event, currentOf(p))">
         </div>
         <div class="hero-info">
           <div class="hero-top">
@@ -742,6 +742,54 @@ createApp({
       return '演示';
     }
 
+    // ── 真实商品图：搜索后异步补图（SVG 占位 → Bing 真实图）──
+    async function loadRealImages(products){
+      try{
+        const keys = [];
+        products.forEach(p => {
+          if(p.img_key) keys.push(p.img_key);
+          (p.variants||[]).forEach(v => { if(v.img_key) keys.push(v.img_key); });
+        });
+        if(!keys.length) return;
+        const r = await fetch('/api/images', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({keys}),
+          signal: AbortSignal.timeout(20000),
+        });
+        if(!r.ok) return;
+        const d = await r.json();
+        const imgs = d.images || {};
+        products.forEach(p => {
+          if(imgs[p.img_key]) p.real_img = imgs[p.img_key];
+          (p.variants||[]).forEach(v => {
+            const vk = v.img_key;
+            if(vk && imgs[vk]) v.real_img = imgs[vk];
+          });
+        });
+      }catch(e){ /* 补图失败保持 SVG 占位 */ }
+    }
+    function realImgOf(item){
+      if(!item) return fallbackImg;
+      if(item.real_img){
+        if(typeof item.real_img === 'string') return item.real_img;
+        if(item.real_img.murl) return item.real_img.murl;
+        if(item.real_img.turl) return item.real_img.turl;
+      }
+      return pngOf(item.image_url);
+    }
+    function onImgErr(e, item){
+      // murl 防盗链失败 → turl；再失败 → SVG 占位
+      if(item && item.real_img){
+        if(item.real_img.murl && item.real_img.turl){
+          const t = item.real_img.turl;
+          item.real_img = {turl: t};
+        }else{
+          item.real_img = null;
+        }
+      }
+    }
+
     // ── 工具 ──
     function fmt(n){
       if(n===null||n===undefined||isNaN(n)) return '—';
@@ -828,6 +876,8 @@ createApp({
           products.value = d.products;
           searched.value = true;
           expandedOffer.value = 0;  // 默认展开最低价平台
+          // 异步补真实商品图（Bing 图片搜索，不阻塞渲染）
+          loadRealImages(d.products);
           // 异步加载社交成交价（不阻塞搜索渲染）
           if(socialTimer) clearTimeout(socialTimer);
           socialTimer = setTimeout(loadSocialDeals, 600);
@@ -989,7 +1039,7 @@ createApp({
     document.documentElement.setAttribute('data-theme', theme.value);
 
     return { keyword, products, searched, loading, errorMsg, emptyMsg, theme,
-             hotKeywords, fallbackImg, pngOf, srcLabel,
+             hotKeywords, fallbackImg, pngOf, srcLabel, realImgOf, onImgErr,
              fmt, fmtCount, bestOf, specChipsOf, sortedOffersOf, platColorOf, priceGapOf,
              curMain, allVariantsOf, activeIdxOf, currentOf, selectVariant, variantShortName,
              activeProduct, switchProduct,

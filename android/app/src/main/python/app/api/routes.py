@@ -77,6 +77,9 @@ def _serialize_one(p, storage, rec: dict) -> dict:
     high = prices[-1] if prices else 0
     low = prices[0] if prices else 0
     savings = round((best.list_price - best.final_price), 2) if best and best.list_price else 0
+    # 真实图缓存键（前端批量请求 /api/images 补真图）；name 含型号+颜色
+    from ..sources.image_fetcher import RealImageFetcher
+    img_key = RealImageFetcher.make_key("", p.name or "")
     return {
         "sku_fingerprint": p.sku_fingerprint,
         "name": p.name,
@@ -84,6 +87,7 @@ def _serialize_one(p, storage, rec: dict) -> dict:
         "model": p.model,
         "specs": p.specs,
         "image_url": p.image_url,
+        "img_key": img_key,
         "ad_slogan": p.ad_slogan,
         "description": p.description,
         "rating": p.rating,
@@ -295,3 +299,31 @@ async def social_deals(
     result["keyword"] = keyword
     result["requested"] = limit
     return result
+
+
+# 真实商品图获取器（懒加载单例：Bing 图片搜索 + 磁盘缓存）
+_img_fetcher = None
+
+
+def _get_img_fetcher():
+    global _img_fetcher
+    if _img_fetcher is None:
+        from ..sources.image_fetcher import RealImageFetcher
+        _img_fetcher = RealImageFetcher()
+    return _img_fetcher
+
+
+@router.post("/images")
+async def fetch_images(payload: dict):
+    """批量获取商品真实图：POST {"keys": ["品牌|型号", ...]}
+
+    Returns: {"images": {"key": {"murl": str, "turl": str}}}
+    失败/未命中 → 该 key 缺省（前端保持 SVG 占位）。
+    """
+    from fastapi import Body
+    keys = (payload or {}).get("keys") or []
+    if not isinstance(keys, list) or not keys:
+        return {"images": {}}
+    fetcher = _get_img_fetcher()
+    images = await asyncio.to_thread(fetcher.fetch_many, [str(k) for k in keys][:60])
+    return {"images": images}
