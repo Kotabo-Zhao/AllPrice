@@ -330,6 +330,10 @@
   .social-deals{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
   .deal-card{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:12px;transition:all .2s}
   .deal-card:hover{border-color:var(--line2)}
+  .deal-src{font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;flex:none;margin-right:8px}
+  .ds-xhs{background:#ff2442;color:#fff}
+  .ds-smzdm{background:#3182f6;color:#fff}
+  .ds-demo{background:var(--line2);color:var(--text2)}
   .deal-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
   .deal-platform{
     font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;
@@ -430,7 +434,7 @@
           <div v-for="(p,pi) in products" :key="p.sku_fingerprint"
                class="pn-item" :class="{'pn-active': pi===activeProduct}"
                @click="switchProduct(pi)">
-            <img class="pn-img" :src="p.image_url || fallbackImg" :alt="p.name" loading="lazy">
+            <img class="pn-img" :src="pngOf(p.image_url)" :alt="p.name" loading="lazy">
             <div class="pn-info">
               <div class="pn-name">{{ p.name }}</div>
               <div class="pn-price">¥{{ fmt(p.best_price) }}</div>
@@ -443,7 +447,7 @@
       <!-- 商品概览 -->
       <section class="hero-card" v-for="(p,i) in products" :key="p.sku_fingerprint" v-show="i===activeProduct">
         <div class="hero-img-wrap">
-          <img class="hero-img" :src="currentOf(p).image_url || fallbackImg" :alt="currentOf(p).name" loading="lazy">
+          <img class="hero-img" :src="pngOf(currentOf(p).image_url)" :alt="currentOf(p).name" loading="lazy">
         </div>
         <div class="hero-info">
           <div class="hero-top">
@@ -574,7 +578,7 @@
         <div class="social-head">
           <span class="social-badge">👥 全网成交价</span>
           <span class="social-title">大家实际买到多少钱</span>
-          <span class="social-src">{{ socialDeals.source === 'demo' ? '社交源暂不可达 · 演示数据 + AI 分析' : '来源：什么值得买等晒价平台' }}</span>
+          <span class="social-src">{{ socialDeals.source === 'demo' ? '社交源暂不可达 · 演示数据 + AI 分析' : '来源：小红书 · 什么值得买' }}</span>
         </div>
 
         <div class="social-loading" v-if="socialLoading">正在分析社交平台晒价数据…</div>
@@ -589,6 +593,7 @@
           <div class="social-deals">
             <div class="deal-card" v-for="(d,di) in socialDeals.deals.slice(0,6)" :key="di">
               <div class="deal-top">
+                <span class="deal-src" :class="'ds-' + (d.platform || 'demo')">{{ srcLabel(d.platform) }}</span>
                 <span class="deal-platform">{{ d.buy_platform || d.platform }}</span>
                 <span class="deal-price">¥{{ fmt(d.price) }}</span>
               </div>
@@ -693,7 +698,7 @@
 </div>
 
 <script>
-const { createApp, ref, computed } = Vue;
+const { createApp, ref, computed, reactive } = Vue;
 
 createApp({
   setup(){
@@ -710,6 +715,32 @@ createApp({
     const hotKeywords = HOT;
     // 纯 ASCII 内嵌 SVG（btoa 不支持非 Latin1 字符）
     const fallbackImg = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#1a2131"/><text x="100" y="115" font-size="60" text-anchor="middle" fill="#5c6a85">$</text></svg>');
+
+    // ── 图片兼容：SVG data URI → PNG（安卓老 WebView 对 SVG 支持不稳）──
+    const imgCache = reactive({});
+    function pngOf(src){
+      if(!src) return fallbackImg;
+      if(imgCache[src]) return imgCache[src];
+      if(!String(src).startsWith('data:image/svg')) return src;
+      const img = new Image();
+      img.onload = () => {
+        try{
+          const c = document.createElement('canvas');
+          c.width = img.naturalWidth || 600;
+          c.height = img.naturalHeight || 600;
+          c.getContext('2d').drawImage(img, 0, 0);
+          imgCache[src] = c.toDataURL('image/png');
+        }catch(e){ imgCache[src] = src; }
+      };
+      img.onerror = () => { imgCache[src] = src; };
+      img.src = src;
+      return src;
+    }
+    function srcLabel(platform){
+      if(platform === 'xhs') return '小红书';
+      if(platform === 'smzdm') return '值得买';
+      return '演示';
+    }
 
     // ── 工具 ──
     function fmt(n){
@@ -958,7 +989,7 @@ createApp({
     document.documentElement.setAttribute('data-theme', theme.value);
 
     return { keyword, products, searched, loading, errorMsg, emptyMsg, theme,
-             hotKeywords, fallbackImg,
+             hotKeywords, fallbackImg, pngOf, srcLabel,
              fmt, fmtCount, bestOf, specChipsOf, sortedOffersOf, platColorOf, priceGapOf,
              curMain, allVariantsOf, activeIdxOf, currentOf, selectVariant, variantShortName,
              activeProduct, switchProduct,

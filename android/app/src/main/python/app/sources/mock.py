@@ -143,47 +143,103 @@ class MockSource(BaseSource):
     def _gen_image(brand: str, model: str) -> str:
         """生成内嵌 SVG 商品图（零外部依赖，任意环境可显示）
 
-        视觉：品牌色渐变背景 + 产品剪影（手机/耳机/吸尘器）+ 品牌标识 + 高光
+        视觉：品牌色渐变场景 + 产品剪影（鞋/手机/耳机/手表/平板/笔记本）+ 展示台
         """
         import base64
         brand_l = brand.lower()
-        color = "#5B7FBE" if brand_l == "apple" else "#C0392B" if "华为" in brand else "#3A7D44" if "小米" in brand else "#4A4A6A"
-        # 产品剪影（按型号关键词判断类别）
+        color = ("#5B7FBE" if brand_l == "apple" else "#C0392B" if "华为" in brand
+                 else "#3A7D44" if "小米" in brand
+                 else "#1E4E8C" if brand in ("耐克", "阿迪达斯", "李宁")
+                 else "#4A4A6A")
         m = (model or "").lower()
-        if any(k in m for k in ("iphone", "mate", "pro", "phone", "手机")):
+        # 品牌优先分类，避免 "Air"→笔记本、"Mate"→手机 的误命中
+        if brand in ("耐克", "阿迪达斯", "李宁") or any(k in m for k in ("跑鞋", "鞋", "sneaker", "dunk", "air max")):
+            # 运动鞋侧影：鞋底 + 鞋面 + Swoosh + 鞋带区
+            device = (
+                # 展示台阴影
+                '<ellipse cx="300" cy="468" rx="205" ry="16" fill="rgba(0,0,0,0.30)"/>'
+                # 鞋底
+                '<path d="M138 398 q95 32 192 26 q108 -7 150 -32 l-4 -24 q-58 34 -152 32 q-100 -3 -182 -24 z" '
+                'fill="rgba(255,255,255,0.94)"/>'
+                '<path d="M138 398 q95 32 192 26 q108 -7 150 -32" fill="none" stroke="rgba(0,0,0,0.12)" stroke-width="3"/>'
+                # 鞋身
+                '<path d="M142 390 q-8 -78 58 -108 q64 -30 128 -12 q66 16 110 64 q32 36 34 78 q-4 28 -52 20 '
+                'q-118 -26 -206 8 q-50 14 -58 -12 q-6 -16 -14 -38 z" fill="url(#shoe)"/>'
+                # 鞋带区
+                '<path d="M178 282 q22 -6 44 -4 l26 34 q-24 10 -52 6 q-14 -2 -20 -6 z" fill="rgba(255,255,255,0.35)"/>'
+                # Swoosh 勾
+                '<path d="M236 322 q92 -34 158 -40 q40 -4 56 6 q-36 2 -72 16 q-64 22 -128 26 q-12 1 -16 -4 z" '
+                'fill="rgba(255,255,255,0.92)"/>'
+                # 鞋领
+                '<path d="M322 280 q30 -2 52 14 q24 16 34 42 l-14 4 q-12 -26 -36 -38 q-24 -12 -44 -8 z" '
+                'fill="rgba(255,255,255,0.30)"/>'
+            )
+        elif brand == "Apple" and "macbook" in m:
+            # 笔记本
+            device = ('<rect x="140" y="140" width="320" height="210" rx="14" fill="rgba(255,255,255,0.9)"/>'
+                      '<rect x="158" y="158" width="284" height="176" rx="8" fill="url(#screen)"/>'
+                      '<path d="M150 350 q150 26 300 0 l-6 34 q-144 24 -288 0 z" fill="rgba(255,255,255,0.85)"/>')
+        elif any(k in m for k in ("matepad", "pad", "平板")):
+            # 平板
+            device = ('<rect x="150" y="130" width="300" height="400" rx="18" fill="rgba(255,255,255,0.9)"/>'
+                      '<rect x="170" y="150" width="260" height="340" rx="10" fill="url(#screen)"/>'
+                      '<circle cx="300" cy="510" r="5" fill="rgba(255,255,255,0.5)"/>')
+        elif any(k in m for k in ("watch", "手表", "s3")):
+            # 智能手表
+            device = ('<rect x="218" y="150" width="164" height="44" rx="14" fill="rgba(255,255,255,0.78)"/>'
+                      '<rect x="218" y="406" width="164" height="44" rx="14" fill="rgba(255,255,255,0.78)"/>'
+                      '<circle cx="300" cy="300" r="96" fill="url(#watchFace)"/>'
+                      '<circle cx="300" cy="300" r="96" fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="14"/>')
+        elif any(k in m for k in ("iphone", "phone", "手机", "redmi", "14 pro")):
+            # 手机
             device = ('<rect x="225" y="120" width="150" height="300" rx="26" fill="rgba(255,255,255,0.92)"/>'
                       '<rect x="245" y="140" width="110" height="240" rx="12" fill="url(#screen)"/>'
                       '<circle cx="300" cy="392" r="8" fill="rgba(0,0,0,0.35)"/>')
-        elif any(k in m for k in ("wh", "xm", "耳机", "headphone")):
+        elif any(k in m for k in ("wh", "xm", "freebuds", "耳机", "headphone")):
+            # 头戴/入耳耳机
             device = ('<path d="M170 300 h60 a70 70 0 0 1 140 0 h60" stroke="rgba(255,255,255,0.92)" '
                       'stroke-width="20" fill="none" stroke-linecap="round"/>'
                       '<rect x="150" y="290" width="45" height="130" rx="18" fill="rgba(255,255,255,0.85)"/>'
                       '<rect x="405" y="290" width="45" height="130" rx="18" fill="rgba(255,255,255,0.85)"/>')
         elif any(k in m for k in ("v15", "dyson", "吸尘", "detect")):
+            # 吸尘器
             device = ('<rect x="265" y="140" width="70" height="200" rx="12" fill="rgba(255,255,255,0.9)"/>'
                       '<rect x="255" y="320" width="90" height="30" rx="14" fill="rgba(255,255,255,0.9)"/>'
                       '<rect x="265" y="340" width="26" height="90" rx="10" fill="rgba(255,255,255,0.75)"/>'
                       '<rect x="309" y="340" width="26" height="90" rx="10" fill="rgba(255,255,255,0.75)"/>')
         else:
-            device = '<rect x="230" y="160" width="140" height="220" rx="18" fill="rgba(255,255,255,0.9)"/>'
+            # 华为 Mate 系列等 → 手机；其他 → 通用盒子
+            if "mate" in m:
+                device = ('<rect x="225" y="120" width="150" height="300" rx="26" fill="rgba(255,255,255,0.92)"/>'
+                          '<rect x="245" y="140" width="110" height="240" rx="12" fill="url(#screen)"/>'
+                          '<circle cx="300" cy="392" r="8" fill="rgba(0,0,0,0.35)"/>')
+            else:
+                device = ('<ellipse cx="300" cy="462" rx="180" ry="14" fill="rgba(0,0,0,0.28)"/>'
+                          '<rect x="230" y="160" width="140" height="220" rx="18" fill="rgba(255,255,255,0.9)"/>')
         svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600">
 <defs>
 <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-<stop offset="0" stop-color="{color}"/><stop offset="0.6" stop-color="{color}" stop-opacity="0.75"/>
+<stop offset="0" stop-color="{color}"/><stop offset="0.55" stop-color="{color}" stop-opacity="0.78"/>
 <stop offset="1" stop-color="#141826"/>
 </linearGradient>
 <linearGradient id="screen" x1="0" y1="0" x2="0" y2="1">
 <stop offset="0" stop-color="#2c3852"/><stop offset="1" stop-color="#141826"/>
 </linearGradient>
+<linearGradient id="shoe" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="rgba(255,255,255,0.95)"/><stop offset="1" stop-color="rgba(255,255,255,0.55)"/>
+</linearGradient>
+<radialGradient id="watchFace" cx="0.5" cy="0.4" r="0.7">
+<stop offset="0" stop-color="#1a2338"/><stop offset="1" stop-color="#0d1119"/>
+</radialGradient>
 <radialGradient id="glow" cx="0.35" cy="0.25" r="0.8">
-<stop offset="0" stop-color="rgba(255,255,255,0.22)"/><stop offset="1" stop-color="rgba(255,255,255,0)"/>
+<stop offset="0" stop-color="rgba(255,255,255,0.20)"/><stop offset="1" stop-color="rgba(255,255,255,0)"/>
 </radialGradient>
 </defs>
 <rect width="600" height="600" rx="40" fill="url(#g)"/>
 <rect width="600" height="600" rx="40" fill="url(#glow)"/>
 {device}
-<text x="300" y="520" font-size="30" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold" fill="rgba(255,255,255,0.95)" letter-spacing="4">{brand[:10]}</text>
-<text x="300" y="555" font-size="19" text-anchor="middle" font-family="Arial, sans-serif" fill="rgba(255,255,255,0.65)">{model[:20]}</text>
+<text x="300" y="522" font-size="30" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold" fill="rgba(255,255,255,0.95)" letter-spacing="4">{brand[:10]}</text>
+<text x="300" y="556" font-size="19" text-anchor="middle" font-family="Arial, sans-serif" fill="rgba(255,255,255,0.65)">{model[:20]}</text>
 </svg>'''
         return "data:image/svg+xml;base64," + base64.b64encode(svg.encode("utf-8")).decode()
 
@@ -194,16 +250,43 @@ class MockSource(BaseSource):
             specs["存储容量"] = f"{cap}GB"
         if brand == "Apple" and "Pro" in model:
             specs.update({"屏幕": "6.1英寸 OLED 120Hz", "芯片": "A17 Pro", "摄像头": "4800万像素三摄", "电池": "3274mAh", "重量": "187g", "系统": "iOS 17"})
-        elif brand == "Apple":
+        elif brand == "Apple" and "iPhone" in model:
             specs.update({"屏幕": "6.1英寸 OLED", "芯片": "A16", "摄像头": "4800万像素双摄", "电池": "3349mAh", "重量": "171g", "系统": "iOS 17"})
+        elif brand == "Apple" and "MacBook" in model:
+            specs.update({"屏幕": "13.6英寸 Liquid Retina", "芯片": "Apple M3", "内存": "8GB 统一内存", "固态硬盘": "256GB", "续航": "18小时", "重量": "1.24kg", "接口": "雷雳3 ×2"})
+        elif brand == "华为" and "MatePad" in model:
+            specs.update({"屏幕": "11英寸 2.5K 120Hz", "芯片": "麒麟9000S", "电池": "8300mAh", "充电": "66W快充", "系统": "HarmonyOS 4", "重量": "508g"})
+        elif brand == "华为" and "FreeBuds" in model:
+            specs.update({"降噪": "智慧动态降噪3.0", "续航": "30小时(含充电盒)", "蓝牙": "5.3", "防水": "IP54", "延迟": "90ms低延迟"})
         elif brand == "华为":
             specs.update({"屏幕": "6.82英寸 OLED 120Hz", "芯片": "麒麟9000S", "摄像头": "5000万像素三摄", "电池": "5000mAh", "重量": "225g", "系统": "HarmonyOS 4"})
+        elif brand == "小米" and "Watch" in model:
+            specs.update({"屏幕": "1.43英寸 AMOLED", "表盘": "46mm", "续航": "15天", "防水": "5ATM", "心率监测": "支持", "GPS": "双频GPS", "蓝牙": "5.3"})
         elif brand == "小米":
             specs.update({"屏幕": "6.36英寸 OLED 120Hz", "芯片": "骁龙8 Gen3", "摄像头": "5000万像素徕卡三摄", "电池": "4610mAh", "重量": "193g", "系统": "HyperOS"})
+        elif brand == "索尼" and "WH" in model:
+            specs.update({"降噪": "HD降噪处理器QN1", "续航": "30小时", "蓝牙": "5.3", "驱动": "30mm动圈", "快充": "充电10分钟听5小时", "重量": "250g"})
         elif brand == "索尼":
-            specs.update({"降噪": "HD降噪处理器QN1", "续航": "30小时", "蓝牙": "5.3", "驱动": "30mm动圈"})
+            specs.update({"降噪": "降噪处理器V2", "续航": "24小时(含充电盒)", "蓝牙": "5.3", "防水": "IPX4", "编解码": "LDAC"})
         elif brand == "戴森":
-            specs.update({"吸力": "260AW", "续航": "60分钟", "过滤": "HEPA全机过滤", "探测": "激光探测"})
+            specs.update({"吸力": "260AW", "续航": "60分钟", "过滤": "HEPA全机过滤", "探测": "激光探测", "尘桶容量": "0.77L", "重量": "3.1kg"})
+        elif brand in ("耐克", "阿迪达斯", "李宁"):
+            tech = {
+                "Air Force 1": ("Air 缓震气垫", "皮革鞋面", "低帮"),
+                "Dunk Low": ("Zoom Air 缓震", "皮革拼接", "低帮"),
+                "Pegasus": ("React 泡棉", "工程网面", "低帮"),
+                "Air Max 270": ("Air Max 270 大气垫", "网眼鞋面", "低帮"),
+                "Ultraboost": ("Boost 缓震中底", "Primeknit 针织", "低帮"),
+                "贝壳头": ("贝壳头设计", "皮革鞋面", "低帮"),
+                "悟道": ("云缓震科技", "织物鞋面", "低帮"),
+                "赤兔": ("䨻轻弹科技", "MONO 纱线", "低帮"),
+            }
+            mid = next((t for k, t in tech.items() if k.lower() in model.lower()), ("EVA 缓震", "织物鞋面", "低帮"))
+            specs.update({
+                "鞋面材质": mid[1], "缓震科技": mid[0], "鞋帮高度": mid[2],
+                "闭合方式": "系带", "尺码": "36-46（含半码）", "重量": "约320-420g",
+                "适用场景": "通勤/日常穿搭", "上市年份": "2025",
+            })
         return specs
 
     def _make_offer(self, platform, label, title, price, list_price, params, brand) -> PlatformOffer:
