@@ -30,6 +30,7 @@ class PriceBreakdown:
     total_discount: float
     applied: list[Coupon] = field(default_factory=list)
     detail_text: str = ""
+    steps: list[dict] = field(default_factory=list)  # 每步明细 [{label, amount}]
 
 
 def _apply_coupon(price: float, coupon: Coupon) -> float:
@@ -98,10 +99,10 @@ class DiscountEngine:
 
         return best
 
-    def _best_for_base(self, base: float, coupons: list[Coupon]) -> PriceBreakdown:
-        """在固定基础价下，穷举所有合法优惠组合取最优"""
+    def _all_combos_for_base(self, base: float, coupons: list[Coupon]) -> list[PriceBreakdown]:
+        """在固定基础价下，穷举所有合法优惠组合（含互斥组约束）"""
         if not coupons:
-            return PriceBreakdown(final_price=base, total_discount=0, detail_text="")
+            return [PriceBreakdown(final_price=base, total_discount=0)]
 
         # 按互斥组分组：组内互斥（最多取1个），组间可叠加
         groups: dict[str, list[Coupon]] = {}
@@ -112,52 +113,128 @@ class DiscountEngine:
             else:
                 non_exclusive.append(c)
 
-        # 每个互斥组：选择"不选/选最优之一"
+        # 每个互斥组：选择"不选/选其一"
         group_choices: list[list[Coupon]] = [[]]
         for gname, gcoupons in groups.items():
-            # 组内每张券单独作为候选（同组券条件不同，可能适合不同价位）
             new_choices = list(group_choices)
             for gc in gcoupons:
                 for existing in group_choices:
                     new_choices.append(existing + [gc])
             group_choices = new_choices
 
-        # 非互斥优惠：可作为补充，但只取能生效的
-        best: Optional[PriceBreakdown] = None
+        # 非互斥券：每个券"用/不用"的全组合（上限内）
+        combos: list[PriceBreakdown] = []
         checked = 0
-
         for group_sel in group_choices:
-            # 补充非互斥券：从能生效的券中按"减得多优先"逐个尝试叠加
             selected = list(group_sel)
             price = base
             for c in selected:
                 price = _apply_coupon(price, c)
-            # 尝试加非互斥券（贪心：按节省额排序）
-            usable = sorted(
-                [c for c in non_exclusive],
-                key=lambda c: self._saving(base, c),
-                reverse=True,
-            )
-            for c in usable:
-                new_price = _apply_coupon(price, c)
-                if new_price < price - 0.005:
-                    selected.append(c)
-                    price = new_price
-                checked += 1
-                if checked > MAX_COMBINATIONS:
+            # 非互斥券全组合（2^n，n 小）
+            usable = [c for c in non_exclusive]
+            for r in range(len(usable) + 1):
+                for subset in itertools.combinations(usable, r):
+                    p = price
+                    applied = list(selected)
+                    valid = True
+                    for c in subset:
+                        new_p = _apply_coupon(p, c)
+                        if new_p >= p - 0.005:
+                            valid = False  # 该券不生效，跳过此组合
+                            break
+                        p = new_p
+                        applied.append(c)
+                    if valid:
+                        combos.append(PriceBreakdown(
+                            final_price=max(0.0, p),
+                            total_discount=base - p,
+                            applied=applied,
+                        ))
+                    checked += 1
+                    if checked > MAX_COMBINATIONS:
+                        return combos or [PriceBreakdown(final_price=base, total_discount=0)]
+        return combos or [PriceBreakdown(final_price=base, total_discount=0)]
+
+    def _best_for_base(self, base: float, coupons: list[Coupon]) -> PriceBreakdown:
+        """在固定基础价下，穷举所有合法优惠组合取最优"""
+        combos = self._all_combos_for_base(base, coupons)
+        return min(combos, key=lambda b: b.final_price) if combos else \
+            PriceBreakdown(final_price=base, total_discount=0)
+
+    def enumerate_plans(
+        self,
+        base_price: float,
+        coupons: list[Coupon],
+        member_price: Optional[float] = None,
+        cashback: float = 0.0,
+        ship_fee: float = 0.0,
+        max_plans: int = 6,
+    ) -> list[dict]:
+        """枚举所有合法优惠组合方案，输出结构化明细
+
+        Returns:
+            [{
+                "plan_index": int,
+                "base_label": "原价"|"会员价",
+                "base_price": float,
+                "steps": [{"label": "满1000减100", "amount": -100, "type": "coupon"}],
+                "cashback": float, "ship_fee": float,
+                "final_price": float,
+                "total_saved": float,
+                "is_best": bool,
+            }, ...]  按 final_price 升序，最多 max_plans 个
+        """
+        plans: list[dict] = []
+        base_options = [("原价", base_price)]
+        if member_price and 0 < member_price < base_price:
+            base_options.append(("会员价", member_price))
+
+        for base_label, base in base_options:
+            combos = self._all_combos_for_base(base, coupons)
+            # 按最终价排序，去重（同优惠组合只留一次）
+            seen: set[str] = set()
+            uniq: list[PriceBreakdown] = []
+            for b in sorted(combos, key=lambda x: x.final_price):
+                key = ",".join(sorted(c.label for c in b.applied))
+                if key in seen:
+                    continue
+                seen.add(key)
+                uniq.append(b)
+
+            for b in uniq:
+                final = max(0.0, b.final_price - cashback + ship_fee)
+                steps = [{"label": f"{base_label}{base:g}元", "amount": 0, "type": "base"}]
+                # 逐步计算每个优惠的实际节省（模拟顺序应用）
+                running = base
+                for c in b.applied:
+                    after = _apply_coupon(running, c)
+                    saving = round(running - after, 2)
+                    steps.append({"label": c.label, "type": "coupon", "amount": -saving})
+                    running = after
+                if cashback > 0:
+                    steps.append({"label": f"返现{cashback:g}元", "amount": -cashback, "type": "cashback"})
+                if ship_fee > 0:
+                    steps.append({"label": f"运费{ship_fee:g}元", "amount": ship_fee, "type": "ship"})
+                plans.append({
+                    "base_label": base_label,
+                    "base_price": round(base, 2),
+                    "steps": steps,
+                    "cashback": cashback,
+                    "ship_fee": ship_fee,
+                    "final_price": round(final, 2),
+                    "total_saved": round(base_price - final, 2),
+                    "coupon_labels": [c.label for c in b.applied],
+                })
+                if len(plans) >= max_plans:
                     break
+            if len(plans) >= max_plans:
+                break
 
-            breakdown = PriceBreakdown(
-                final_price=max(0.0, price),
-                total_discount=base - price,
-                applied=selected,
-            )
-            if best is None or breakdown.final_price < best.final_price:
-                best = breakdown
-
-        if best is None:
-            best = PriceBreakdown(final_price=base, total_discount=0, detail_text="")
-        return best
+        plans.sort(key=lambda p: p["final_price"])
+        for i, p in enumerate(plans):
+            p["is_best"] = (i == 0)
+            p["plan_index"] = i + 1
+        return plans
 
     @staticmethod
     def _saving(base: float, coupon: Coupon) -> float:

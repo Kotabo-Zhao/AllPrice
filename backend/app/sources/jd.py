@@ -54,6 +54,7 @@ class JDSource:
             headers=_HEADERS,
             timeout=timeout,
             follow_redirects=True,
+            trust_env=False,  # 绕过系统代理直连（代理未运行时避免连接被拒）
         )
 
     # ── 价格 ──

@@ -58,7 +58,8 @@ class AIRecommendService:
 
     def __init__(self, api_key: str = ""):
         self._api_key = api_key or os.getenv("DEEPSEEK_API_KEY", "")
-        self._client = httpx.Client(timeout=10.0)
+        # trust_env=False: 绕过系统代理直连（代理软件未运行时避免连接被拒）
+        self._client = httpx.Client(timeout=25.0, trust_env=False)
 
     @property
     def available(self) -> bool:

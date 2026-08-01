@@ -241,6 +241,71 @@
   /* ═══════════ 页脚 ═══════════ */
   .footer{margin:40px 0 24px;text-align:center;color:var(--text3);font-size:11px;letter-spacing:1px}
 
+  /* ═══════════ 优惠方案卡片 ═══════════ */
+  .plans-area{margin-top:14px;border-top:1px solid var(--line);padding-top:14px}
+  .plans-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:6px}
+  .plans-title{font-size:14px;font-weight:700}
+  .plans-hint{color:var(--text3);font-size:11px}
+  .plans-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+  .plan-card{
+    background:var(--card2);border:1px solid var(--line);border-radius:12px;
+    padding:14px;transition:all .2s;position:relative;
+  }
+  .plan-card:hover{border-color:var(--line2);transform:translateY(-1px)}
+  .plan-card.plan-best{
+    border-color:rgba(212,175,55,.5);
+    background:linear-gradient(135deg,rgba(212,175,55,.08),var(--card2));
+    box-shadow:0 0 20px rgba(212,175,55,.08);
+  }
+  .plan-top{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .plan-badge{
+    background:linear-gradient(135deg,#d4af37,#8a5a12);color:#1a1505;
+    font-size:10px;font-weight:800;padding:2px 8px;border-radius:999px;letter-spacing:.5px;
+  }
+  .plan-name{color:var(--text2);font-size:12px;flex:1}
+  .plan-final{font-size:17px;font-weight:800;color:var(--gold2);font-variant-numeric:tabular-nums}
+  .plan-steps{display:flex;flex-direction:column;gap:5px;margin-bottom:10px}
+  .plan-step{display:flex;justify-content:space-between;align-items:center;font-size:12px}
+  .step-label{color:var(--text2)}
+  .step-amount{font-weight:600;font-variant-numeric:tabular-nums}
+  .plan-total{font-size:12px;color:var(--text2);border-top:1px dashed var(--line2);padding-top:8px}
+  .row-open td{background:rgba(212,175,55,.04)}
+
+  /* ═══════════ 社交成交价 ═══════════ */
+  .social-panel{
+    margin-top:14px;background:var(--card);border:1px solid var(--line);
+    border-radius:var(--radius);padding:20px;min-width:0;
+  }
+  .social-head{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+  .social-badge{
+    background:linear-gradient(135deg,#ff8c42,#e85d2a);color:#fff;
+    padding:3px 12px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:1px;
+  }
+  .social-title{font-size:14px;font-weight:700}
+  .social-src{color:var(--text3);font-size:11px;margin-left:auto}
+  .social-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+  .social-kpi{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px 14px}
+  .social-kpi .sk-label{color:var(--text3);font-size:10px;letter-spacing:1px;margin-bottom:4px}
+  .social-kpi .sk-value{font-size:17px;font-weight:800;color:var(--gold2);font-variant-numeric:tabular-nums}
+  .social-deals{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+  .deal-card{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:12px;transition:all .2s}
+  .deal-card:hover{border-color:var(--line2)}
+  .deal-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .deal-platform{
+    font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;
+    background:rgba(77,159,255,.12);color:#9cc3ff;
+  }
+  .deal-price{font-size:16px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums}
+  .deal-coupon{color:var(--down);font-size:11px;margin-top:4px}
+  .deal-time{color:var(--text3);font-size:10px;margin-top:4px}
+  .social-summary{
+    margin-top:14px;background:linear-gradient(135deg,rgba(139,124,246,.1),rgba(77,159,255,.05));
+    border:1px solid rgba(139,124,246,.25);border-radius:10px;padding:14px 16px;
+    font-size:13px;line-height:1.9;color:var(--text);
+  }
+  .social-summary b{color:var(--gold2)}
+  .social-loading{color:var(--text3);font-size:13px;padding:20px 0;text-align:center}
+
   /* ═══════════ 响应式 ═══════════ */
   @media(max-width:900px){
     .kpi-row{grid-template-columns:repeat(3,1fr)}
@@ -269,6 +334,8 @@
     .panel{padding:14px}
     .hero-title{font-size:18px}
     .chart-grid{grid-template-columns:1fr}
+    .social-kpis{grid-template-columns:repeat(2,1fr)}
+    .plans-grid{grid-template-columns:1fr}
   }
 </style>
 </head>
@@ -437,6 +504,39 @@
         <div class="ai-body" v-html="bestOf(products[0]).recommendation"></div>
       </section>
 
+      <!-- 全网真实成交价（社交晒价 + AI 分析） -->
+      <section class="social-panel">
+        <div class="social-head">
+          <span class="social-badge">👥 全网成交价</span>
+          <span class="social-title">大家实际买到多少钱</span>
+          <span class="social-src">{{ socialDeals.source === 'demo' ? '社交源暂不可达 · 演示数据 + AI 分析' : '来源：什么值得买等晒价平台' }}</span>
+        </div>
+
+        <div class="social-loading" v-if="socialLoading">正在分析社交平台晒价数据…</div>
+
+        <template v-if="!socialLoading && socialDeals.deals && socialDeals.deals.length">
+          <div class="social-kpis">
+            <div class="social-kpi"><div class="sk-label">最低成交</div><div class="sk-value">¥{{ fmt(socialDeals.price_range.low) }}</div></div>
+            <div class="social-kpi"><div class="sk-label">最高成交</div><div class="sk-value">¥{{ fmt(socialDeals.price_range.high) }}</div></div>
+            <div class="social-kpi"><div class="sk-label">平均成交</div><div class="sk-value">¥{{ fmt(socialDeals.price_range.avg) }}</div></div>
+            <div class="social-kpi"><div class="sk-label">最常见平台</div><div class="sk-value" style="font-size:14px">{{ socialDeals.common_platform || '—' }}</div></div>
+          </div>
+          <div class="social-deals">
+            <div class="deal-card" v-for="(d,di) in socialDeals.deals.slice(0,6)" :key="di">
+              <div class="deal-top">
+                <span class="deal-platform">{{ d.buy_platform || d.platform }}</span>
+                <span class="deal-price">¥{{ fmt(d.price) }}</span>
+              </div>
+              <div class="deal-coupon" v-if="d.coupon_info">🎟️ {{ d.coupon_info }}</div>
+              <div class="deal-time">{{ d.title }} · {{ d.time }}</div>
+            </div>
+          </div>
+          <div class="social-summary" v-if="socialDeals.ai_summary">
+            <b>🤖 AI 攻略</b><br>{{ socialDeals.ai_summary }}
+          </div>
+        </template>
+      </section>
+
       <!-- 规格参数 + 报价明细 -->
       <section class="chart-grid" style="margin-top:14px">
         <div class="panel">
@@ -453,14 +553,16 @@
         <div class="panel">
           <div class="panel-head">
             <div class="panel-title"><span class="dot"></span>平台报价明细</div>
-            <span class="panel-sub">{{ bestOf(products[0]).offers.length }} 个平台 · 按到手价排序</span>
+            <span class="panel-sub">{{ bestOf(products[0]).offers.length }} 个平台 · 按到手价排序 · 点击行看优惠方案</span>
           </div>
           <table class="offer-table">
             <thead><tr>
               <th>平台</th><th>店铺</th><th>标价</th><th>优惠</th><th>到手价</th><th>销量</th><th></th>
             </tr></thead>
             <tbody>
-              <tr v-for="(o,oi) in sortedOffersOf(bestOf(products[0]))" :key="oi" :class="{'row-lowest': o.final_price===bestOf(products[0]).best_price}">
+              <tr v-for="(o,oi) in sortedOffersOf(bestOf(products[0]))" :key="oi"
+                  :class="{'row-lowest': o.final_price===bestOf(products[0]).best_price, 'row-open': expandedOffer===oi}"
+                  style="cursor:pointer" @click="toggleOfferPlan(oi)">
                 <td>
                   <span class="plat-badge"><span class="plat-dot" :style="{background:platColorOf(o.platform)}"></span>{{ o.platform_label }}</span>
                   <span class="lowest-flag" v-if="o.final_price===bestOf(products[0]).best_price">最低</span>
@@ -473,10 +575,39 @@
                 </td>
                 <td><span class="offer-final">¥{{ fmt(o.final_price) }}</span></td>
                 <td class="offer-sales">{{ o.sales || '—' }}</td>
-                <td><a class="go-btn" :href="o.url" target="_blank" rel="noopener">去购买 →</a></td>
+                <td><a class="go-btn" :href="o.url" target="_blank" rel="noopener" @click.stop>去购买 →</a></td>
               </tr>
             </tbody>
           </table>
+
+          <!-- 优惠组合方案（点击平台行展开） -->
+          <div v-if="expandedOffer !== null && expandedOfferData" class="plans-area">
+            <div class="plans-head">
+              <span class="plans-title">🎟️ {{ expandedOfferData.platform_label }} · 优惠组合方案（{{ expandedOfferData.plans.length }} 种）</span>
+              <span class="plans-hint">每种方式单独算，选最划算的</span>
+            </div>
+            <div class="plans-grid">
+              <div v-for="(pl,pi) in expandedOfferData.plans" :key="pi"
+                   class="plan-card" :class="{'plan-best': pl.is_best}">
+                <div class="plan-top">
+                  <span class="plan-badge" v-if="pl.is_best">最低价方案</span>
+                  <span class="plan-name">方案{{ pl.plan_index }}</span>
+                  <span class="plan-final">¥{{ fmt(pl.final_price) }}</span>
+                </div>
+                <div class="plan-steps">
+                  <div v-for="(s,si) in pl.steps" :key="si" class="plan-step">
+                    <span class="step-label">{{ s.label }}</span>
+                    <span class="step-amount" :style="{color: (s.amount||0) < 0 ? 'var(--down)' : ((s.amount||0) > 0 ? 'var(--up)' : 'var(--text3)')}">
+                      {{ (s.amount||0) < 0 ? '−¥' + fmt(-s.amount) : ((s.amount||0) > 0 ? '+¥' + fmt(s.amount) : '') }}
+                    </span>
+                  </div>
+                </div>
+                <div class="plan-total">
+                  共省 <b style="color:var(--down)">¥{{ fmt(pl.total_saved) }}</b> · 到手 <b>¥{{ fmt(pl.final_price) }}</b>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -567,6 +698,10 @@ createApp({
         if(d.products && d.products.length){
           products.value = d.products;
           searched.value = true;
+          expandedOffer.value = 0;  // 默认展开最低价平台
+          // 异步加载社交成交价（不阻塞搜索渲染）
+          if(socialTimer) clearTimeout(socialTimer);
+          socialTimer = setTimeout(loadSocialDeals, 600);
         }else{
           searched.value = true;
           emptyMsg.value = d.message || '未找到该商品，试试更精确的关键词';
@@ -589,6 +724,35 @@ createApp({
       localStorage.setItem('allprice_theme', theme.value);
       document.documentElement.setAttribute('data-theme', theme.value);
       location.reload();
+    }
+
+    // ── 优惠组合方案展开 ──
+    const expandedOffer = ref(null);
+    const expandedOfferData = computed(()=>{
+      if(expandedOffer.value === null) return null;
+      const offers = sortedOffersOf(bestOf(products.value[0]));
+      return offers[expandedOffer.value] || null;
+    });
+    function toggleOfferPlan(i){
+      expandedOffer.value = expandedOffer.value === i ? null : i;
+    }
+
+    // ── 社交成交价（异步加载，不阻塞搜索） ──
+    const socialDeals = ref({deals: [], price_range: {}, common_platform: '', ai_summary: '', source: ''});
+    const socialLoading = ref(false);
+    let socialTimer = null;
+    async function loadSocialDeals(){
+      const kw = keyword.value.trim();
+      if(!kw) return;
+      socialLoading.value = true;
+      try{
+        const r = await fetch('/api/social-deals?keyword='+encodeURIComponent(kw)+'&limit=8', {signal: AbortSignal.timeout(30000)});
+        if(r.ok) socialDeals.value = await r.json();
+      }catch(e){
+        console.error('social deals failed:', e);
+      }finally{
+        socialLoading.value = false;
+      }
     }
 
     // ── 图表：90天走势 ──
@@ -709,6 +873,8 @@ createApp({
              hotKeywords, fallbackImg,
              fmt, fmtCount, bestOf, specChipsOf, sortedOffersOf, platColorOf, priceGapOf,
              doSearch, quickSearch, onKeyUp, scrollTo, toggleTheme,
+             expandedOffer, expandedOfferData, toggleOfferPlan,
+             socialDeals, socialLoading,
              trendSeries, trendGridY, trendGridLabels, trendLegend,
              barData, donutBest,
              histData, histLabels, histBase };

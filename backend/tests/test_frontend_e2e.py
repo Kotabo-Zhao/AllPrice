@@ -147,6 +147,41 @@ class TestSearchFlow:
         assert "¥" in kpi_text, "KPI 应显示货币符号"
         page.close()
 
+    def test_offer_plans(self, browser):
+        """优惠组合方案：默认展开最低价平台，含方案卡片与明细"""
+        page = _open_page(browser, VIEWPORTS["desktop"])
+        _do_search(page)
+        # 默认展开（expandedOffer=0）
+        page.wait_for_selector(".plans-area", timeout=8000)
+        cards = page.query_selector_all(".plan-card")
+        assert len(cards) >= 1, "至少一个优惠方案卡片"
+        # 最低价方案标记
+        best = page.query_selector(".plan-card.plan-best")
+        assert best is not None, "缺少最低价方案标记"
+        # 步骤明细
+        steps = page.query_selector_all(".plan-step")
+        assert len(steps) >= 2, f"方案应有至少2个优惠步骤, 实际{len(steps)}"
+        # 点击其他行切换方案区
+        rows = page.query_selector_all(".offer-table tbody tr")
+        if len(rows) > 1:
+            rows[1].click()
+            page.wait_for_timeout(300)
+        page.close()
+
+    def test_social_deals(self, browser):
+        """社交成交价板块：KPI + 成交记录 + AI攻略"""
+        page = _open_page(browser, VIEWPORTS["desktop"])
+        _do_search(page)
+        page.wait_for_selector(".social-kpi", timeout=15000)
+        kpis = page.query_selector_all(".social-kpi")
+        assert len(kpis) >= 3, f"成交价KPI应至少3个, 实际{len(kpis)}"
+        deals = page.query_selector_all(".deal-card")
+        assert len(deals) >= 3, f"成交记录应至少3条, 实际{len(deals)}"
+        # AI 攻略
+        summary = page.query_selector(".social-summary")
+        assert summary is not None, "缺少AI攻略"
+        page.close()
+
 
 class TestMobileSpecific:
     def test_mobile_layout(self, browser):

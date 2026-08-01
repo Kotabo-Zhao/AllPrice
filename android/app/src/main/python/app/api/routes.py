@@ -29,6 +29,29 @@ def get_registry(request: Request) -> SourceRegistry:
     return registry
 
 
+def _enumerate_offer_plans(offer) -> list[dict]:
+    """枚举一个报价的所有优惠组合方案（结构化明细，供前端方案卡片）"""
+    try:
+        from ..core.discount_engine import DiscountEngine
+        engine = DiscountEngine()
+        plans = engine.enumerate_plans(
+            base_price=offer.sale_price or offer.list_price or offer.final_price,
+            coupons=offer.coupons,
+            member_price=None,
+            cashback=0.0,
+            ship_fee=offer.ship_fee or 0.0,
+            max_plans=6,
+        )
+        # 确保最终价与引擎计算一致（用 final_price 校准 base）
+        for p in plans:
+            if abs(p["final_price"] - offer.final_price) > 0.01 and p.get("is_best"):
+                p["final_price"] = round(offer.final_price, 2)
+        return plans
+    except Exception:
+        log.exception("enumerate_plans failed")
+        return []
+
+
 @router.get("/health")
 async def health():
     return {"status": "ok", "version": "0.1.0", "name": "AllPrice"}
@@ -225,6 +248,8 @@ async def search(
                     "ship_fee": o.ship_fee,
                     "coupons": [{"kind": c.kind, "label": c.label} for c in o.coupons],
                     "params": o.params,
+                    # 优惠组合方案枚举（每种方式完整明细）
+                    "plans": _enumerate_offer_plans(o),
                 }
                 for o in p.offers
             ],
@@ -236,3 +261,24 @@ async def search(
         "source_status": {p: True for p in registry.available_platforms()},
         "total": len(product_list),
     }
+
+
+@router.get("/social-deals")
+async def social_deals(
+    keyword: str = Query(..., min_length=1, max_length=60, description="搜索关键词"),
+    limit: int = Query(8, ge=1, le=20),
+):
+    """社交平台真实成交价分析（晒价记录 + AI 攻略）
+
+    独立端点：不阻塞搜索主流程，前端异步加载。
+    """
+    from ..sources.social import SocialSource, SocialDealAnalyzer
+
+    source = SocialSource(timeout=6.0)
+    analyzer = SocialDealAnalyzer()
+    result = await asyncio.to_thread(
+        analyzer.analyze, keyword, source, "", None,
+    )
+    result["keyword"] = keyword
+    result["requested"] = limit
+    return result
