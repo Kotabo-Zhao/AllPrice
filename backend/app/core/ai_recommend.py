@@ -27,7 +27,27 @@ from ..models import Product
 log = logging.getLogger(__name__)
 
 DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
-DEEPSEEK_MODEL = "deepseek-chat"  # 免费档
+# v2: 接入 DeepSeek V4 Flash（免费档，思考模式显式关闭保证低延迟）
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash")
+
+
+def _load_env():
+    """加载 backend/.env（轻量实现，避免额外依赖 python-dotenv）"""
+    try:
+        env_path = os.path.join(os.path.dirname(__file__), "..", "..", ".env")
+        env_path = os.path.abspath(env_path)
+        if os.path.exists(env_path):
+            with open(env_path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+    except Exception as e:
+        log.warning(f".env load failed: {e}")
+
+
+_load_env()
 
 # 规则推荐的平台权重（价格优先，平台信誉/发货为次要因子）
 _PLATFORM_WEIGHT = {"jd": 1.0, "taobao": 0.97, "pdd": 0.94, "mock": 0.8}
@@ -63,6 +83,7 @@ class AIRecommendService:
         try:
             payload = {
                 "model": DEEPSEEK_MODEL,
+                "thinking": {"type": "disabled"},  # V4 Flash 思考模式默认开，显式关闭
                 "messages": [
                     {
                         "role": "system",

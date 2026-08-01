@@ -29,7 +29,12 @@ def make_product():
 
 
 class TestRuleFallback:
-    def test_no_key_uses_rule(self):
+    @pytest.fixture(autouse=True)
+    def _no_key(self, monkeypatch):
+        """模拟无 key 环境（真实 .env 可能已配 key）"""
+        monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+
+    def test_no_key_uses_rule(self, _no_key):
         """无 API key → 规则推荐"""
         svc = AIRecommendService(api_key="")
         assert not svc.available
@@ -37,12 +42,12 @@ class TestRuleFallback:
         assert result["source"] == "rule"
         assert "拼多多" in result["recommendation"]  # 拼多多最低价 6099
 
-    def test_rule_mentions_best_price(self):
+    def test_rule_mentions_best_price(self, _no_key):
         svc = AIRecommendService(api_key="")
         result = svc.recommend(make_product())
         assert "6099" in result["recommendation"]
 
-    def test_empty_product(self):
+    def test_empty_product(self, _no_key):
         svc = AIRecommendService(api_key="")
         p = Product(sku_fingerprint="x", name="空商品", offers=[])
         result = svc.recommend(p)
