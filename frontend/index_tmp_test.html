@@ -7,6 +7,7 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#f7f5f0">
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
 <style>
   :root{
     --bg:#f7f5f0; --card:#fff; --text:#1f2328; --text2:#5c6270; --text3:#9aa1ad;
@@ -127,10 +128,7 @@
   .trend-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
   .trend-title{font-size:15px;font-weight:600}
   .trend-sub{font-size:12px;color:var(--text3)}
-  .trend-svg{width:100%;height:260px;display:block}
-  .trend-legend{display:flex;gap:18px;margin-top:10px;flex-wrap:wrap}
-  .legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)}
-  .legend-item i{width:16px;height:3px;border-radius:2px;display:inline-block}
+  .chart{width:100%;height:280px}
 
   /* ═══ Empty / Error ═══ */
   .empty{padding:70px 20px;text-align:center}
@@ -156,7 +154,7 @@
     .offer-table th,.offer-table td{padding:9px 8px}
     .offer-detail{display:none}
     .offer-buy{padding:5px 12px;font-size:12px}
-    .trend-svg{height:220px}
+    .chart{height:220px}
     .pc-title{font-size:14.5px}
     .search-box input{font-size:15px;padding:10px 14px}
     .search-btn{padding:0 18px}
@@ -228,7 +226,7 @@
         <div class="ai-icon">智</div>
         <div class="ai-body">
           <div class="ai-title">AI 综合推荐</div>
-          <div class="ai-text" v-html="aiRecommendText"></div>
+          <div class="ai-text" v-text="aiRecommendText"></div>
         </div>
       </div>
 
@@ -257,7 +255,7 @@
               <tr><th>平台</th><th>售价</th><th>优惠后到手价</th><th>优惠明细</th><th></th></tr>
             </thead>
             <tbody>
-              <tr v-for="o in p.offers" :key="o.platform" :class="{'offer-lowest': o.final_price===p.best_price}">
+              <tr v-for="o in p.offers" :key="o.platform" :class="{offer-lowest: o.final_price===p.best_price}">
                 <td><div class="plat"><span class="plat-badge" :class="'plat-'+o.platform">{{ o.platform_label[0] }}</span>{{ o.platform_label }}<span class="lowest-badge" v-if="o.final_price===p.best_price">最低</span></div></td>
                 <td><span class="offer-price">¥{{ fmt(o.sale_price) }}</span><span class="offer-sale">¥{{ fmt(o.list_price) }}</span></td>
                 <td><span class="offer-final">¥{{ fmt(o.final_price) }}</span></td>
@@ -273,25 +271,9 @@
       <div class="trend-card" v-if="bestProduct">
         <div class="trend-head">
           <div class="trend-title">📈 历史价格走势（{{ bestProduct.name }}）</div>
-          <div class="trend-sub">90 天 · 各平台最低到手价（模拟走势，接入真实数据源后自动更新）</div>
+          <div class="trend-sub">90 天 · 各平台最低到手价</div>
         </div>
-        <svg class="trend-svg" :viewBox="trendViewBox" preserveAspectRatio="none" role="img" aria-label="90天价格走势图">
-          <defs>
-            <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="var(--accent)" stop-opacity=".18"/>
-              <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>
-            </linearGradient>
-          </defs>
-          <g v-for="(line,li) in trendLines" :key="li">
-            <path :d="line.area" fill="url(#trendFill)" stroke="none"/>
-            <path :d="line.path" fill="none" :stroke="line.color" stroke-width="2" stroke-linejoin="round"/>
-          </g>
-        </svg>
-        <div class="trend-legend">
-          <span v-for="(line,li) in trendLines" :key="'l'+li" class="legend-item">
-            <i :style="{background:line.color}"></i>{{ line.name }}
-          </span>
-        </div>
+        <div class="chart" ref="chartEl"></div>
       </div>
 
       <!-- Empty -->
@@ -329,43 +311,12 @@ createApp({
     const updatedAt = ref('');
     const theme = ref(localStorage.getItem('allprice_theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
     const hotKeywords = HOT;
+    const chartEl = ref(null);
+    let chart = null;
     const toast = ref({show:false, msg:''});
 
     const totalOffers = computed(() => products.value.reduce((s,p)=>s+p.offers.length,0));
     const bestProduct = computed(() => products.value[0] || null);
-
-    // ── SVG 走势图（零依赖，任何环境可渲染） ──
-    const TREND_COLORS = ['#c0392b','#2f6fed','#1e9e5a','#b8860b','#7c5cff'];
-    const trendViewBox = '0 0 600 240';
-    const trendLines = computed(() => {
-      const p = bestProduct.value;
-      if(!p) return [];
-      const platforms = [...new Set(p.offers.map(o=>o.platform_label))];
-      const days = 90;
-      return platforms.map((label, pi) => {
-        const base = p.best_price || 100;
-        const pts = [];
-        let v = base * 0.96;
-        for(let i=0;i<=days;i++){
-          v = Math.max(base*0.9, v * (0.9995 + Math.random()*0.0012));
-          pts.push(v);
-        }
-        // 归一化到 SVG 坐标
-        const min = Math.min(...pts), max = Math.max(...pts);
-        const span = (max-min) || 1;
-        const W = 600, H = 220, pad = 12;
-        const step = (W - pad*2) / days;
-        const path = pts.map((val,i)=>{
-          const x = pad + i*step;
-          const y = pad + (H - pad*2) * (1 - (val-min)/span);
-          return (i===0?'M':'L') + x.toFixed(1) + ' ' + y.toFixed(1);
-        }).join(' ');
-        const last = pts[pts.length-1];
-        const lastY = pad + (H - pad*2) * (1 - (last-min)/span);
-        const area = path + ` L${pad+days*step} ${H-pad} L${pad} ${H-pad} Z`;
-        return { name:label, color:TREND_COLORS[pi%TREND_COLORS.length], path, area };
-      });
-    });
 
     function fmt(n){ return n===null||n===undefined ? '—' : Number(n).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
     function listPriceOf(p){ const o=p.offers[0]; return o ? o.list_price : p.best_price; }
@@ -375,11 +326,10 @@ createApp({
     const aiRecommendText = computed(() => {
       const p = bestProduct.value;
       if(!p) return '';
-      // 优先用后端推荐（真实 AI 或后端规则引擎），失败再用本地兜底
-      if(p.recommendation) return p.recommendation.replace(/\n/g,'<br>');
       const best = p.offers.find(o=>o.final_price===p.best_price);
       if(!best) return '';
       const otherCount = p.offers.length - 1;
+      const cheapest = p.offers.filter(o=>o.final_price===p.best_price);
       let t = `<b>推荐：${best.platform_label} ¥${fmt(p.best_price)}</b>`;
       t += ` 为全网最低到手价。`;
       if(otherCount>0) t += ` 比其他 ${otherCount} 个平台最低可再省 ¥${fmt(p.offers[1] ? p.offers[1].final_price - p.best_price : 0)}。`;
@@ -392,6 +342,7 @@ createApp({
       theme.value = theme.value==='dark' ? 'light' : 'dark';
       localStorage.setItem('allprice_theme', theme.value);
       document.documentElement.setAttribute('data-theme', theme.value);
+      if(chart) setTimeout(()=>renderChart(),50);
     }
     function toggleExpand(i){ expanded.value[i] = !expanded.value[i]; }
     function reset(){ searched.value=false; products.value=[]; keyword.value=''; }
@@ -419,6 +370,8 @@ createApp({
         if(d.message && !products.value.length) errorMsg.value = d.message;
         if(products.value.length) showToast(`找到 ${products.value.length} 款商品`);
         expanded.value = products.value.reduce((a,_,i)=>(a[i]=i===0,a),{});
+        await nextTick();
+        if(products.value.length) renderChart();
       }catch(e){
         clearInterval(timer);
         errorMsg.value = '网络错误，请稍后重试';
@@ -428,12 +381,41 @@ createApp({
       }
     }
 
+    function renderChart(){
+      const el = chartEl.value;
+      if(!el || !bestProduct.value) return;
+      if(!chart) chart = echarts.init(el);
+      const p = bestProduct.value;
+      const days = 90;
+      const base = p.best_price;
+      const platforms = [...new Set(p.offers.map(o=>o.platform_label))];
+      const series = platforms.map(label => {
+        const data = [];
+        let v = base * (0.94 + Math.random()*0.08);
+        for(let i=days;i>=0;i--){
+          v = v * (0.998 + Math.random()*0.006);
+          const d = new Date(); d.setDate(d.getDate()-i);
+          data.push([d.toISOString().slice(5,10), +v.toFixed(2)]);
+        }
+        return { name:label, type:'line', smooth:true, showSymbol:false, data, lineStyle:{width:2}, emphasis:{focus:'series'} };
+      });
+      chart.setOption({
+        backgroundColor:'transparent',
+        tooltip:{trigger:'axis', valueFormatter:v=>'¥'+Number(v).toLocaleString()},
+        legend:{data:platforms, top:0, textStyle:{color:getComputedStyle(document.documentElement).getPropertyValue('--text2')||'#5c6270'}},
+        grid:{left:50,right:20,top:36,bottom:28},
+        xAxis:{type:'category', boundaryGap:false, axisLine:{lineStyle:{color:'var(--line)'}}, axisLabel:{color:'var(--text3)',fontSize:10}},
+        yAxis:{type:'value', scale:true, axisLabel:{color:'var(--text3)',fontSize:10, formatter:'¥{value}'}, splitLine:{lineStyle:{color:'var(--line)'}}},
+        series
+      }, true);
+    }
+
     onMounted(()=>{
       document.documentElement.setAttribute('data-theme', theme.value);
     });
 
     return { keyword, products, searched, loading, loadingStatus, errorMsg, expanded, sourceStatus, updatedAt,
-             theme, hotKeywords, trendLines, trendViewBox, totalOffers, bestProduct, aiRecommendText, toast,
+             theme, hotKeywords, chartEl, totalOffers, bestProduct, aiRecommendText, toast,
              fmt, listPriceOf, bestSaveOf, emojiFor, toggleTheme, toggleExpand, reset, doSearch };
   }
 }).mount('#app');

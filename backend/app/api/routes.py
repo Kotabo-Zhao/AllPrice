@@ -45,11 +45,50 @@ async def platforms(registry: SourceRegistry = Depends(get_registry)):
     }
 
 
+@router.get("/history/{sku_fingerprint}")
+async def history(
+    sku_fingerprint: str,
+    days: int = Query(90, ge=7, le=365),
+    request: Request = None,
+):
+    """商品历史价格（走势图数据源）"""
+    storage = getattr(request.app.state, "storage", None)
+    if storage is None:
+        from ..core.storage import Storage
+        storage = Storage()
+        request.app.state.storage = storage
+    rows = storage.get_price_history(sku_fingerprint, days=days)
+    # 按平台分组
+    by_platform: dict[str, list[dict]] = {}
+    for r in rows:
+        by_platform.setdefault(r["platform_label"], []).append({
+            "price": r["final_price"], "time": r["created_at"],
+        })
+    return {
+        "sku_fingerprint": sku_fingerprint,
+        "days": days,
+        "series": by_platform,
+        "lowest": storage.get_lowest_price(sku_fingerprint, days=days),
+    }
+
+
+@router.get("/storage/stats")
+async def storage_stats(request: Request):
+    """存储统计（健康检查）"""
+    storage = getattr(request.app.state, "storage", None)
+    if storage is None:
+        from ..core.storage import Storage
+        storage = Storage()
+        request.app.state.storage = storage
+    return storage.stats()
+
+
 @router.get("/search")
 async def search(
     keyword: str = Query(..., min_length=1, max_length=60, description="搜索关键词"),
     limit: int = Query(6, ge=1, le=15),
     registry: SourceRegistry = Depends(get_registry),
+    request: Request = None,
 ):
     """全网搜索商品 → 各平台报价 → 归一化 → 按最低到手价排序
 
@@ -88,10 +127,35 @@ async def search(
     normalizer = ProductNormalizer()
     products = normalizer.normalize(all_offers, keyword)
 
+    # AI 推荐（无 key/失败时降级规则推荐，不影响主流程）
+    ai_service = getattr(request.app.state, "ai_service", None)
+    if ai_service is None:
+        from ..core.ai_recommend import AIRecommendService
+        ai_service = AIRecommendService()
+        request.app.state.ai_service = ai_service
+
+    # 存储（价格快照落库，走势图数据源）
+    storage = getattr(request.app.state, "storage", None)
+    if storage is None:
+        from ..core.storage import Storage
+        storage = Storage()
+        request.app.state.storage = storage
+
     # 序列化
     product_list = []
     for p in products:
         best = p.best_offer()
+        rec = ai_service.recommend(p)
+        # 价格快照落库
+        for o in p.offers:
+            storage.save_price_snapshot(
+                p.sku_fingerprint, o.platform, o.platform_label, p.name,
+                o.sale_price, o.final_price, o.price_detail,
+            )
+        storage.cache_product(p)
+        # 历史走势（真实数据，不足则前端补模拟）
+        history = storage.get_price_history(p.sku_fingerprint, days=90)
+        lowest_90 = storage.get_lowest_price(p.sku_fingerprint, days=90)
         product_list.append({
             "sku_fingerprint": p.sku_fingerprint,
             "name": p.name,
@@ -103,6 +167,10 @@ async def search(
             "best_platform": best.platform if best else None,
             "best_platform_label": best.platform_label if best else None,
             "offer_count": len(p.offers),
+            "recommendation": rec.get("recommendation", ""),
+            "recommend_source": rec.get("source", "rule"),
+            "lowest_90d": round(lowest_90, 2) if lowest_90 else None,
+            "history_points": len(history),
             "offers": [
                 {
                     "platform": o.platform,

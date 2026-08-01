@@ -35,7 +35,12 @@ async def lifespan(app: FastAPI):
         registry.register(MockSource())
         # 京东公开接口（免费；网络受限时自动熔断，不影响 mock）
         registry.register(JDSource())
-        # TODO(v2): 淘宝/拼多多/闲鱼 爬虫适配器
+        # 淘宝/拼多多爬虫（Playwright；网络受限时自动降级）
+        from .sources.taobao import TaobaoSource
+        from .sources.pdd import PddSource
+        registry.register(TaobaoSource())
+        registry.register(PddSource())
+        # TODO(v3): 闲鱼/抖音 适配器
         app.state.registry = registry
     log.info(f"AllPrice started with platforms: {registry.available_platforms()}")
     yield
