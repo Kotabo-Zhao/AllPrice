@@ -202,6 +202,13 @@ class DiscountEngine:
                 uniq.append(b)
 
             for b in uniq:
+                # 只保留"当前真实可用"的方案：
+                # ① 至少应用了一张券 或 有返现（零优惠裸价无信息量，不展示）
+                # ② 券必须有效（is_active 不为 False；过期/失效券不参与）
+                if not b.applied and cashback <= 0:
+                    continue
+                if any(getattr(c, "is_active", True) is False for c in b.applied):
+                    continue
                 final = max(0.0, b.final_price - cashback + ship_fee)
                 steps = [{"label": f"{base_label}{base:g}元", "amount": 0, "type": "base"}]
                 # 逐步计算每个优惠的实际节省（模拟顺序应用）

@@ -127,6 +127,19 @@
   }
   .hero-price .platform{color:var(--gold2);font-size:13px;font-weight:600}
 
+  /* ═══════════ 规格选择器 ═══════════ */
+  .spec-selector{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .ss-label{color:var(--text3);font-size:11px;letter-spacing:1px;margin-right:2px}
+  .ss-item{
+    background:var(--card2);border:1px solid var(--line2);color:var(--text2);
+    border-radius:8px;padding:4px 12px;font-size:12px;cursor:pointer;transition:all .18s;
+  }
+  .ss-item:hover{border-color:var(--gold);color:var(--gold)}
+  .ss-active{
+    background:rgba(212,175,55,.15);border-color:var(--gold);color:var(--gold2);
+    font-weight:700;
+  }
+
   /* ═══════════ KPI 指标条 ═══════════ */
   .kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-top:14px}
   .kpi{
@@ -387,40 +400,49 @@
       <!-- 商品概览 -->
       <section class="hero-card" v-for="(p,i) in products" :key="p.sku_fingerprint">
         <div class="hero-img-wrap">
-          <img class="hero-img" :src="p.image_url || fallbackImg" :alt="p.name" loading="lazy">
+          <img class="hero-img" :src="currentOf(p).image_url || fallbackImg" :alt="currentOf(p).name" loading="lazy">
         </div>
         <div class="hero-info">
           <div class="hero-top">
             <span class="brand-badge">{{ p.brand || '品牌' }}</span>
-            <span class="stars" v-if="p.rating">★ {{ p.rating }}</span>
-            <span v-if="p.review_count">{{ fmtCount(p.review_count) }} 条评价</span>
+            <span class="stars" v-if="currentOf(p).rating">★ {{ currentOf(p).rating }}</span>
+            <span v-if="currentOf(p).review_count">{{ fmtCount(currentOf(p).review_count) }} 条评价</span>
           </div>
-          <h2 class="hero-title">{{ p.name }}</h2>
-          <div class="hero-slogan" v-if="p.ad_slogan">「 {{ p.ad_slogan }} 」</div>
-          <p class="hero-desc" v-if="p.description">{{ p.description }}</p>
-          <div class="spec-chips" v-if="specChipsOf(p).length">
-            <span class="chip" v-for="(v,k) in specChipsOf(p)" :key="k"><b>{{ k }}</b> {{ v }}</span>
+          <h2 class="hero-title">{{ currentOf(p).name }}</h2>
+          <div class="hero-slogan" v-if="currentOf(p).ad_slogan">「 {{ currentOf(p).ad_slogan }} 」</div>
+          <p class="hero-desc" v-if="currentOf(p).description">{{ currentOf(p).description }}</p>
+          <!-- 规格切换器（同系列不同规格 → 不同价格） -->
+          <div class="spec-selector" v-if="allVariantsOf(p).length > 1">
+            <span class="ss-label">规格</span>
+            <span v-for="(v,vi) in allVariantsOf(p)" :key="v.sku_fingerprint"
+                  class="ss-item" :class="{'ss-active': activeIdxOf(p)===vi}"
+                  @click="selectVariant(p, vi)">
+              {{ variantShortName(v) }}
+            </span>
+          </div>
+          <div class="spec-chips" v-if="specChipsOf(currentOf(p)).length">
+            <span class="chip" v-for="(v,k) in specChipsOf(currentOf(p))" :key="k"><b>{{ k }}</b> {{ v }}</span>
           </div>
           <div class="hero-meta">
-            <span>📦 {{ p.offer_count }} 个平台在售</span>
-            <span v-if="p.lowest_90d">📉 90天最低 ¥{{ fmt(p.lowest_90d) }}</span>
+            <span>📦 {{ currentOf(p).offer_count }} 个平台在售</span>
+            <span v-if="currentOf(p).lowest_90d">📉 90天最低 ¥{{ fmt(currentOf(p).lowest_90d) }}</span>
           </div>
         </div>
         <div class="hero-price">
           <span class="label">全网最低到手价</span>
-          <span class="num">¥{{ fmt(p.best_price) }}</span>
-          <span class="platform">{{ p.best_platform_label }} · 已含优惠</span>
+          <span class="num">¥{{ fmt(currentOf(p).best_price) }}</span>
+          <span class="platform">{{ currentOf(p).best_platform_label }} · 已含优惠</span>
         </div>
       </section>
 
       <!-- KPI 指标条 -->
       <section class="kpi-row">
-        <div class="kpi accent"><div class="k-label">最低到手价</div><div class="k-value">¥{{ fmt(bestOf(products[0]).best_price) }}</div><div class="k-sub">{{ bestOf(products[0]).best_platform_label }}</div></div>
-        <div class="kpi"><div class="k-label">平台均价</div><div class="k-value">¥{{ fmt(bestOf(products[0]).price_stats.avg) }}</div><div class="k-sub">3 平台综合</div></div>
-        <div class="kpi"><div class="k-label">最高报价</div><div class="k-value">¥{{ fmt(bestOf(products[0]).price_stats.high) }}</div><div class="k-sub">价差 ¥{{ fmt(priceGapOf(bestOf(products[0]))) }}</div></div>
-        <div class="kpi"><div class="k-label">优惠节省</div><div class="k-value" style="color:var(--down)">¥{{ fmt(bestOf(products[0]).price_stats.savings) }}</div><div class="k-sub">叠加后已省</div></div>
-        <div class="kpi"><div class="k-label">历史最低</div><div class="k-value">¥{{ fmt(bestOf(products[0]).lowest_90d || bestOf(products[0]).best_price) }}</div><div class="k-sub">90 天窗口</div></div>
-        <div class="kpi"><div class="k-label">评分</div><div class="k-value">{{ bestOf(products[0]).rating || '—' }}</div><div class="k-sub">{{ fmtCount(bestOf(products[0]).review_count) }} 评价</div></div>
+        <div class="kpi accent"><div class="k-label">最低到手价</div><div class="k-value">¥{{ fmt(curMain.best_price) }}</div><div class="k-sub">{{ curMain.best_platform_label }}</div></div>
+        <div class="kpi"><div class="k-label">平台均价</div><div class="k-value">¥{{ fmt(curMain.price_stats.avg) }}</div><div class="k-sub">3 平台综合</div></div>
+        <div class="kpi"><div class="k-label">最高报价</div><div class="k-value">¥{{ fmt(curMain.price_stats.high) }}</div><div class="k-sub">价差 ¥{{ fmt(priceGapOf(curMain)) }}</div></div>
+        <div class="kpi"><div class="k-label">优惠节省</div><div class="k-value" style="color:var(--down)">¥{{ fmt(curMain.price_stats.savings) }}</div><div class="k-sub">叠加后已省</div></div>
+        <div class="kpi"><div class="k-label">历史最低</div><div class="k-value">¥{{ fmt(curMain.lowest_90d || curMain.best_price) }}</div><div class="k-sub">90 天窗口</div></div>
+        <div class="kpi"><div class="k-label">评分</div><div class="k-value">{{ curMain.rating || '—' }}</div><div class="k-sub">{{ fmtCount(curMain.review_count) }} 评价</div></div>
       </section>
 
       <!-- 图表区 -->
@@ -468,16 +490,16 @@
               <circle cx="90" cy="90" r="62" fill="none" stroke="#d4af37" stroke-width="26"
                       :stroke-dasharray="donutBest.dash" :stroke-dashoffset="donutBest.offset"
                       transform="rotate(-90 90 90)" stroke-linecap="butt"/>
-              <text x="90" y="86" text-anchor="middle" fill="#fff" font-size="20" font-weight="800">¥{{ fmt(bestOf(products[0]).best_price) }}</text>
+              <text x="90" y="86" text-anchor="middle" fill="#fff" font-size="20" font-weight="800">¥{{ fmt(curMain.best_price) }}</text>
               <text x="90" y="104" text-anchor="middle" fill="var(--text3)" font-size="10">最低到手</text>
             </svg>
             <div style="flex:1;min-width:200px">
               <div class="legend" style="flex-direction:column;gap:10px">
-                <span class="legend-item"><i style="background:var(--line2)"></i>平台标价 ¥{{ fmt(bestOf(products[0]).offers[0].list_price) }}</span>
-                <span class="legend-item"><i style="background:var(--down)"></i>优惠叠加 −¥{{ fmt(bestOf(products[0]).price_stats.savings) }}</span>
-                <span class="legend-item"><i style="background:var(--gold)"></i>到手价 ¥{{ fmt(bestOf(products[0]).best_price) }}</span>
+                <span class="legend-item"><i style="background:var(--line2)"></i>平台标价 ¥{{ fmt(curMain.offers[0].list_price) }}</span>
+                <span class="legend-item"><i style="background:var(--down)"></i>优惠叠加 −¥{{ fmt(curMain.price_stats.savings) }}</span>
+                <span class="legend-item"><i style="background:var(--gold)"></i>到手价 ¥{{ fmt(curMain.best_price) }}</span>
               </div>
-              <p style="color:var(--text3);font-size:11px;margin-top:10px;line-height:1.6">{{ bestOf(products[0]).offers[0].price_detail }}</p>
+              <p style="color:var(--text3);font-size:11px;margin-top:10px;line-height:1.6">{{ curMain.offers[0].price_detail }}</p>
             </div>
           </div>
         </div>
@@ -496,12 +518,12 @@
       </section>
 
       <!-- AI 智能推荐 -->
-      <section class="ai-panel" v-if="bestOf(products[0]).recommendation">
+      <section class="ai-panel" v-if="curMain.recommendation">
         <div class="ai-head">
           <span class="ai-badge">AI 智选</span>
-          <span class="ai-label">{{ bestOf(products[0]).recommend_source === 'ai' ? 'DeepSeek V4 Flash 分析' : '智能规则推荐' }}</span>
+          <span class="ai-label">{{ curMain.recommend_source === 'ai' ? 'DeepSeek V4 Flash 分析' : '智能规则推荐' }}</span>
         </div>
-        <div class="ai-body" v-html="bestOf(products[0]).recommendation"></div>
+        <div class="ai-body" v-html="curMain.recommendation"></div>
       </section>
 
       <!-- 全网真实成交价（社交晒价 + AI 分析） -->
@@ -542,10 +564,10 @@
         <div class="panel">
           <div class="panel-head">
             <div class="panel-title"><span class="dot"></span>规格参数</div>
-            <span class="panel-sub">{{ bestOf(products[0]).specs.length || Object.keys(bestOf(products[0]).specs).length }} 项</span>
+            <span class="panel-sub">{{ curMain.specs.length || Object.keys(curMain.specs).length }} 项</span>
           </div>
           <table class="spec-table">
-            <tr v-for="(v,k) in bestOf(products[0]).specs" :key="k">
+            <tr v-for="(v,k) in curMain.specs" :key="k">
               <td>{{ k }}</td><td>{{ v }}</td>
             </tr>
           </table>
@@ -553,19 +575,19 @@
         <div class="panel">
           <div class="panel-head">
             <div class="panel-title"><span class="dot"></span>平台报价明细</div>
-            <span class="panel-sub">{{ bestOf(products[0]).offers.length }} 个平台 · 按到手价排序 · 点击行看优惠方案</span>
+            <span class="panel-sub">{{ curMain.offers.length }} 个平台 · 按到手价排序 · 点击行看优惠方案</span>
           </div>
           <table class="offer-table">
             <thead><tr>
               <th>平台</th><th>店铺</th><th>标价</th><th>优惠</th><th>到手价</th><th>销量</th><th></th>
             </tr></thead>
             <tbody>
-              <tr v-for="(o,oi) in sortedOffersOf(bestOf(products[0]))" :key="oi"
-                  :class="{'row-lowest': o.final_price===bestOf(products[0]).best_price, 'row-open': expandedOffer===oi}"
+              <tr v-for="(o,oi) in sortedOffersOf(curMain)" :key="oi"
+                  :class="{'row-lowest': o.final_price===curMain.best_price, 'row-open': expandedOffer===oi}"
                   style="cursor:pointer" @click="toggleOfferPlan(oi)">
                 <td>
                   <span class="plat-badge"><span class="plat-dot" :style="{background:platColorOf(o.platform)}"></span>{{ o.platform_label }}</span>
-                  <span class="lowest-flag" v-if="o.final_price===bestOf(products[0]).best_price">最低</span>
+                  <span class="lowest-flag" v-if="o.final_price===curMain.best_price">最低</span>
                 </td>
                 <td style="color:var(--text2)">{{ o.shop_name || '—' }}</td>
                 <td style="color:var(--text3);text-decoration:line-through">¥{{ fmt(o.list_price) }}</td>
@@ -583,10 +605,13 @@
           <!-- 优惠组合方案（点击平台行展开） -->
           <div v-if="expandedOffer !== null && expandedOfferData" class="plans-area">
             <div class="plans-head">
-              <span class="plans-title">🎟️ {{ expandedOfferData.platform_label }} · 优惠组合方案（{{ expandedOfferData.plans.length }} 种）</span>
-              <span class="plans-hint">每种方式单独算，选最划算的</span>
+              <span class="plans-title">🎟️ {{ expandedOfferData.platform_label }} · 当前可用优惠组合（{{ expandedOfferData.plans.length }} 种）</span>
+              <span class="plans-hint">实时可用的叠加方式 · 每种单独算</span>
             </div>
-            <div class="plans-grid">
+            <div v-if="!expandedOfferData.plans.length" style="color:var(--text3);font-size:13px;padding:16px 0;text-align:center">
+              该平台当前无可用优惠组合，直接按 {{ fmt(expandedOfferData.final_price) }} 元入手
+            </div>
+            <div class="plans-grid" v-else>
               <div v-for="(pl,pi) in expandedOfferData.plans" :key="pi"
                    class="plan-card" :class="{'plan-best': pl.is_best}">
                 <div class="plan-top">
@@ -672,6 +697,45 @@ createApp({
       return n>=10000 ? (n/10000).toFixed(1)+'万' : n;
     }
     function bestOf(p){ return p || {best_price:null,price_stats:{avg:0,high:0,low:0,savings:0},offers:[]}; }
+
+    // ── 多规格变体：当前激活规格 ──
+    const activeVariant = ref({});  // sku_fingerprint → 变体索引
+    function allVariantsOf(p){
+      const arr = [p].concat(p.variants || []);
+      return arr.filter(Boolean);
+    }
+    function activeIdxOf(p){
+      const idx = activeVariant.value[p.sku_fingerprint];
+      const total = 1 + (p.variants || []).length;
+      return (idx !== undefined && idx < total) ? idx : 0;
+    }
+    function currentOf(p){
+      const arr = allVariantsOf(p);
+      return arr[activeIdxOf(p)] || arr[0] || p;
+    }
+    function selectVariant(p, vi){
+      activeVariant.value[p.sku_fingerprint] = vi;
+      // 切换规格后重置报价表展开
+      expandedOffer.value = 0;
+    }
+    function variantShortName(v){
+      const s = v.specs || {};
+      return (s['颜色'] || s['存储容量'] || s['内存'] || s['版本'] || v.name || '').toString().slice(0, 12);
+    }
+    // ── 优惠组合方案展开（声明先于引用，避免 TDZ） ──
+    const expandedOffer = ref(null);
+    const expandedOfferData = computed(()=>{
+      if(expandedOffer.value === null) return null;
+      const base = currentOf(products.value[0] || {});
+      const offers = (base && base.offers) ? [...base.offers].sort((a,b)=>a.final_price-b.final_price) : [];
+      return offers[expandedOffer.value] || null;
+    });
+    function toggleOfferPlan(i){
+      expandedOffer.value = expandedOffer.value === i ? null : i;
+    }
+
+    // 主商品（KPI/图表/报价表联动）→ 当前激活变体
+    const curMain = computed(() => currentOf(products.value[0] || {}));
     function specChipsOf(p){
       const s = p.specs || {};
       const keys = ['品牌','型号','颜色','存储容量','内存','屏幕','芯片','摄像头','电池','重量','续航'];
@@ -726,16 +790,6 @@ createApp({
       location.reload();
     }
 
-    // ── 优惠组合方案展开 ──
-    const expandedOffer = ref(null);
-    const expandedOfferData = computed(()=>{
-      if(expandedOffer.value === null) return null;
-      const offers = sortedOffersOf(bestOf(products.value[0]));
-      return offers[expandedOffer.value] || null;
-    });
-    function toggleOfferPlan(i){
-      expandedOffer.value = expandedOffer.value === i ? null : i;
-    }
 
     // ── 社交成交价（异步加载，不阻塞搜索） ──
     const socialDeals = ref({deals: [], price_range: {}, common_platform: '', ai_summary: '', source: ''});
@@ -758,7 +812,7 @@ createApp({
     // ── 图表：90天走势 ──
     const trendW = 520, trendH = 220;
     const trendSeries = computed(() => {
-      const p = bestOf(products.value[0]);
+      const p = curMain.value;
       const hist = p.history || [];
       if(!hist.length) return [];
       // 每平台一条线（取各平台报价做基准色；数据点只有全网最低时画一条）
@@ -776,7 +830,7 @@ createApp({
       }];
     });
     const trendGridY = computed(()=>{
-      const p = bestOf(products.value[0]);
+      const p = curMain.value;
       const hist = p.history || [];
       if(!hist.length) return [20,70,120,170,200];
       const min = Math.min(...hist.map(h=>h.price));
@@ -786,7 +840,7 @@ createApp({
       return [0,1,2,3,4].map(i=> 20 + i*(trendH-44)/4);
     });
     const trendGridLabels = computed(()=>{
-      const p = bestOf(products.value[0]);
+      const p = curMain.value;
       const hist = p.history || [];
       if(!hist.length) return [];
       const min = Math.min(...hist.map(h=>h.price));
@@ -799,7 +853,7 @@ createApp({
       });
     });
     const trendLegend = computed(()=>{
-      const p = bestOf(products.value[0]);
+      const p = curMain.value;
       const labels = (p.offers||[]).map(o=>o.platform_label);
       const uniq = [...new Set(labels)];
       return [{label:'全网最低到手价（'+ (uniq.join('/')||'全网') +'）', color:'#d4af37'}];
@@ -808,7 +862,7 @@ createApp({
     // ── 图表：平台对比条形图 ──
     const barW = 520, barH = 200;
     const barData = computed(()=>{
-      const p = bestOf(products.value[0]);
+      const p = curMain.value;
       const offers = sortedOffersOf(p);
       const maxP = Math.max(...offers.map(o=>o.list_price||o.final_price), 1);
       const usable = barW - 90;
@@ -821,7 +875,7 @@ createApp({
 
     // ── 图表：环形图 ──
     const donutBest = computed(()=>{
-      const p = bestOf(products.value[0]);
+      const p = curMain.value;
       const offer = p.offers && p.offers[0];
       const list = offer ? offer.list_price : p.best_price||0;
       const cur = p.best_price||0;
@@ -835,7 +889,7 @@ createApp({
     // 直方图 Y 基线高度（模板引用需要暴露）
     const histBase = histH - 24;
     const histData = computed(()=>{
-      const p = bestOf(products.value[0]);
+      const p = curMain.value;
       const hist = p.history || [];
       if(!hist.length) return [];
       const bins = 10;
@@ -858,7 +912,7 @@ createApp({
       });
     });
     const histLabels = computed(()=>{
-      const p = bestOf(products.value[0]);
+      const p = curMain.value;
       const hist = p.history || [];
       if(!hist.length) return [];
       const min = Math.min(...hist.map(h=>h.price));
@@ -872,6 +926,7 @@ createApp({
     return { keyword, products, searched, loading, errorMsg, emptyMsg, theme,
              hotKeywords, fallbackImg,
              fmt, fmtCount, bestOf, specChipsOf, sortedOffersOf, platColorOf, priceGapOf,
+             curMain, allVariantsOf, activeIdxOf, currentOf, selectVariant, variantShortName,
              doSearch, quickSearch, onKeyUp, scrollTo, toggleTheme,
              expandedOffer, expandedOfferData, toggleOfferPlan,
              socialDeals, socialLoading,

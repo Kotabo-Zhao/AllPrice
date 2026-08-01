@@ -31,32 +31,62 @@ _BRAND_ALIASES = {
 
 
 class ProductNormalizer:
-    """商品归一化：跨平台匹配同一商品"""
+    """商品归一化：跨平台匹配同一商品（系列聚合 + 规格变体）"""
 
     def normalize(self, offers: list[PlatformOffer], keyword: str = "") -> list[Product]:
-        """输入各平台报价，输出合并后的商品列表"""
-        groups: dict[str, list[PlatformOffer]] = {}
+        """输入各平台报价，输出合并后的商品列表
+
+        同一"系列"（品牌+型号相同）合并为一个 Product：
+        - Product.offers 聚合该系列所有平台的报价
+        - Product.variants 按规格（颜色/容量）分组，每个变体含对应平台的报价
+        """
+        # 1. 按系列指纹分组（品牌+型号，不含规格）
+        series_groups: dict[str, list[PlatformOffer]] = {}
         for offer in offers:
-            fp = self._fingerprint(offer)
-            groups.setdefault(fp, []).append(offer)
+            sfp = self._series_fingerprint(offer)
+            series_groups.setdefault(sfp, []).append(offer)
 
         products: list[Product] = []
-        for fp, group in groups.items():
-            # 取标题最长的作为主标题
-            primary = max(group, key=lambda o: len(o.title))
-            specs = self._extract_specs(primary)
-            products.append(Product(
-                sku_fingerprint=fp,
-                name=self._clean_name(primary.title),
-                brand=specs.get("品牌", ""),
-                model=specs.get("型号", ""),
-                specs=specs,
-                image_url=primary.image_url,
-                offers=sorted(group, key=lambda o: o.final_price or float('inf')),
-            ))
+        for sfp, group in series_groups.items():
+            # 2. 系列内再按完整指纹（含规格）拆变体
+            variant_groups: dict[str, list[PlatformOffer]] = {}
+            for offer in group:
+                vfp = self._fingerprint(offer)
+                variant_groups.setdefault(vfp, []).append(offer)
+
+            variants: list[Product] = []
+            for vfp, vgroup in variant_groups.items():
+                primary = max(vgroup, key=lambda o: len(o.title))
+                specs = self._extract_specs(primary)
+                variants.append(Product(
+                    sku_fingerprint=vfp,
+                    name=self._clean_name(primary.title),
+                    brand=specs.get("品牌", ""),
+                    model=specs.get("型号", ""),
+                    specs=specs,
+                    image_url=primary.image_url,
+                    offers=sorted(vgroup, key=lambda o: o.final_price or float('inf')),
+                ))
+            if not variants:
+                continue
+            # 3. 系列主商品 = 最低价变体（其余进 variants 列表）
+            variants.sort(key=lambda v: v.best_offer().final_price if v.best_offer() else float('inf'))
+            main = variants[0]
+            main.variants = variants[1:] if len(variants) > 1 else []
+            products.append(main)
+
         # 按最低到手价排序
         products.sort(key=lambda p: p.best_offer().final_price if p.best_offer() else float('inf'))
         return products
+
+    @staticmethod
+    def _series_fingerprint(offer: PlatformOffer) -> str:
+        """系列指纹：品牌 + 型号（不含规格）——同系列不同规格合并为一个商品"""
+        specs = offer.params or {}
+        brand = ProductNormalizer._norm_brand(specs.get("品牌", "") or ProductNormalizer._guess_brand(offer.title))
+        model = ProductNormalizer._norm_model(specs.get("型号", "") or ProductNormalizer._guess_model(offer.title))
+        raw = json.dumps([brand, model], ensure_ascii=False)
+        return hashlib.md5(raw.encode("utf-8")).hexdigest()[:16]
 
     def _fingerprint(self, offer: PlatformOffer) -> str:
         """SKU 指纹：品牌 + 型号 + 关键规格（规格键归一化）"""

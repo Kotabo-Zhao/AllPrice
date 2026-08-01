@@ -24,6 +24,7 @@ class Coupon:
     max_discount: Optional[float] = None  # 百分比折扣上限
     exclusive_group: Optional[str] = None # 互斥组：同组优惠不能同时用（如 秒杀 vs 平台券）
     source: str = ""   # 数据来源（哪个接口/页面）
+    is_active: bool = True  # 当前是否可用（过期/失效券不参与方案枚举）
 
     def __post_init__(self):
         if self.percent is None and self.discount == 0 and self.threshold == 0:
@@ -66,6 +67,7 @@ class Product:
     rating: float = 0.0         # 综合评分 0-5
     review_count: int = 0       # 评价数
     offers: list[PlatformOffer] = field(default_factory=list)
+    variants: list["Product"] = field(default_factory=list)  # 同系列其他规格变体
 
     def best_offer(self) -> Optional[PlatformOffer]:
         """最低到手价的平台"""

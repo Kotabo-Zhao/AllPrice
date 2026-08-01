@@ -43,13 +43,18 @@ class TestNormalize:
         assert len(products) == 2
 
     def test_different_capacity_not_merged(self):
-        """同型号不同容量不合并"""
+        """同型号不同容量 → 同系列合并为一个商品，容量差异进 variants"""
         p1 = make_offer("jd", "1", "iPhone 15 Pro 128G", 6999,
                         {"品牌": "Apple", "型号": "iPhone 15 Pro", "容量": "128G"})
         p2 = make_offer("jd", "2", "iPhone 15 Pro 256G", 7999,
                         {"品牌": "Apple", "型号": "iPhone 15 Pro", "容量": "256G"})
         products = ProductNormalizer().normalize([p1, p2])
-        assert len(products) == 2
+        # 同系列合并为一个商品
+        assert len(products) == 1
+        # 低容量(128G)作为主商品（价格更低），256G 进 variants
+        assert "128G" in products[0].name or "128" in products[0].name
+        assert len(products[0].variants) == 1
+        assert "256G" in products[0].variants[0].name or "256" in products[0].variants[0].name
 
     def test_spec_key_normalization(self):
         """'内存:256G' 与 '存储:256GB' 视为同一维度（键名归一化后合并）"""

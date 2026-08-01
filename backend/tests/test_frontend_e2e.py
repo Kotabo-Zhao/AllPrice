@@ -182,6 +182,45 @@ class TestSearchFlow:
         assert summary is not None, "缺少AI攻略"
         page.close()
 
+    def test_variant_selector(self, browser):
+        """多规格变体：选择器存在，切换规格价格联动"""
+        page = _open_page(browser, VIEWPORTS["desktop"])
+        _do_search(page, "iPhone")
+        items = page.query_selector_all(".ss-item")
+        assert len(items) >= 2, f"应有至少2个规格项, 实际{len(items)}"
+        price1 = page.inner_text(".hero-price .num")
+        items[1].click()
+        page.wait_for_timeout(600)
+        price2 = page.inner_text(".hero-price .num")
+        # 不同规格价格应不同（mock 变体价差）
+        assert price1 != price2, f"规格切换价格未联动: {price1} == {price2}"
+        # 激活态切换
+        active = page.inner_text(".ss-active")
+        assert active.strip() != "", "缺少激活规格标记"
+        page.close()
+
+    def test_plans_no_bare_price(self, browser):
+        """优惠方案不含裸价方案（只有有优惠的组合）"""
+        page = _open_page(browser, VIEWPORTS["desktop"])
+        _do_search(page, "iPhone")
+        page.wait_for_selector(".plans-area", timeout=8000)
+        # 每个方案必须有优惠步骤（非 base 步骤）
+        bad = page.evaluate("""() => {
+            let n = 0;
+            document.querySelectorAll('.plan-card').forEach(card => {
+                const steps = card.querySelectorAll('.plan-step');
+                // 金额含减号（ASCII '-' 或全角 '−'）
+                const couponSteps = [...steps].filter(s => {
+                    const amt = s.querySelector('.step-amount');
+                    return amt && /[-−]/.test(amt.textContent);
+                });
+                if (couponSteps.length === 0) n++;
+            });
+            return n;
+        }""")
+        assert bad == 0, f"存在 {bad} 个无优惠步骤的方案"
+        page.close()
+
 
 class TestMobileSpecific:
     def test_mobile_layout(self, browser):

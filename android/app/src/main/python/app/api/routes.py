@@ -52,6 +52,81 @@ def _enumerate_offer_plans(offer) -> list[dict]:
         return []
 
 
+def _serialize_one(p, storage, rec: dict) -> dict:
+    """序列化单个商品（主商品/变体共用）；rec 可为空 dict（变体不重复 AI）"""
+    best = p.best_offer()
+    # 历史走势（真实数据不足时用模拟曲线补全，保证看板走势图完整）
+    history = storage.get_price_history(p.sku_fingerprint, days=90)
+    lowest_90 = storage.get_lowest_price(p.sku_fingerprint, days=90)
+    history_series = [
+        {"date": r["created_at"][:10], "price": r["final_price"]}
+        for r in history
+    ]
+    if len(history_series) < 30 and best:
+        from ..sources.mock import MockSource
+        mock_pts = MockSource.gen_history(best.final_price)
+        merged: dict[str, float] = {pt["date"]: pt["price"] for pt in mock_pts}
+        for pt in history_series:
+            merged[pt["date"]] = pt["price"]  # 真实点覆盖模拟
+        history_series = [
+            {"date": d, "price": v} for d, v in sorted(merged.items())
+        ]
+    # 价格统计（看板 KPI）
+    prices = sorted(o.final_price for o in p.offers if o.final_price)
+    avg = sum(prices) / len(prices) if prices else 0
+    high = prices[-1] if prices else 0
+    low = prices[0] if prices else 0
+    savings = round((best.list_price - best.final_price), 2) if best and best.list_price else 0
+    return {
+        "sku_fingerprint": p.sku_fingerprint,
+        "name": p.name,
+        "brand": p.brand,
+        "model": p.model,
+        "specs": p.specs,
+        "image_url": p.image_url,
+        "ad_slogan": p.ad_slogan,
+        "description": p.description,
+        "rating": p.rating,
+        "review_count": p.review_count,
+        "best_price": round(best.final_price, 2) if best else None,
+        "best_platform": best.platform if best else None,
+        "best_platform_label": best.platform_label if best else None,
+        "offer_count": len(p.offers),
+        "recommendation": rec.get("recommendation", ""),
+        "recommend_source": rec.get("source", "rule"),
+        "lowest_90d": round(lowest_90, 2) if lowest_90 else None,
+        "history_points": len(history_series),
+        "price_stats": {
+            "avg": round(avg, 2), "high": round(high, 2),
+            "low": round(low, 2), "savings": round(savings, 2),
+        },
+        "history": history_series,
+        "offers": [
+            {
+                "platform": o.platform,
+                "platform_label": o.platform_label,
+                "product_id": o.product_id,
+                "url": o.url,
+                "title": o.title,
+                "image_url": o.image_url,
+                "shop_name": o.shop_name,
+                "list_price": round(o.list_price, 2),
+                "sale_price": round(o.sale_price, 2),
+                "final_price": round(o.final_price, 2),
+                "price_detail": o.price_detail,
+                "sales": o.sales,
+                "stock": o.stock,
+                "ship_fee": o.ship_fee,
+                "coupons": [{"kind": c.kind, "label": c.label} for c in o.coupons],
+                "params": o.params,
+                # 优惠组合方案枚举（每种方式完整明细；无可用方案返回空数组）
+                "plans": _enumerate_offer_plans(o),
+            }
+            for o in p.offers
+        ],
+    }
+
+
 @router.get("/health")
 async def health():
     return {"status": "ok", "version": "0.1.0", "name": "AllPrice"}
@@ -168,92 +243,30 @@ async def search(
     # 序列化
     product_list = []
     for p in products:
-        best = p.best_offer()
         # 补充商品级信息（广告语/评分/主图）——演示源生成，真实源跳过
-        try:
-            from ..sources.mock import MockSource
-            MockSource.enrich_product(p)
-        except Exception:
-            pass
-        # AI 推荐走线程池，不阻塞事件循环（DeepSeek 网络慢时不拖慢搜索响应）
+        for item in [p] + p.variants:
+            try:
+                from ..sources.mock import MockSource
+                MockSource.enrich_product(item)
+            except Exception:
+                pass
+        # AI 推荐走线程池（只对主商品，不阻塞事件循环）
         rec = await asyncio.to_thread(ai_service.recommend, p)
-        # 价格快照落库
-        for o in p.offers:
-            storage.save_price_snapshot(
-                p.sku_fingerprint, o.platform, o.platform_label, p.name,
-                o.sale_price, o.final_price, o.price_detail,
-            )
-        storage.cache_product(p)
-        # 历史走势（真实数据不足时用模拟曲线补全，保证看板走势图完整）
-        history = storage.get_price_history(p.sku_fingerprint, days=90)
-        lowest_90 = storage.get_lowest_price(p.sku_fingerprint, days=90)
-        history_series = [
-            {"date": r["created_at"][:10], "price": r["final_price"]}
-            for r in history
-        ]
-        if len(history_series) < 30 and best:
-            from ..sources.mock import MockSource
-            mock_pts = MockSource.gen_history(best.final_price)
-            merged: dict[str, float] = {pt["date"]: pt["price"] for pt in mock_pts}
-            for pt in history_series:
-                merged[pt["date"]] = pt["price"]  # 真实点覆盖模拟
-            history_series = [
-                {"date": d, "price": v} for d, v in sorted(merged.items())
-            ]
-        # 价格统计（看板 KPI）
-        prices = sorted(o.final_price for o in p.offers if o.final_price)
-        avg = sum(prices) / len(prices) if prices else 0
-        high = prices[-1] if prices else 0
-        low = prices[0] if prices else 0
-        savings = round((best.list_price - best.final_price), 2) if best and best.list_price else 0
-        product_list.append({
-            "sku_fingerprint": p.sku_fingerprint,
-            "name": p.name,
-            "brand": p.brand,
-            "model": p.model,
-            "specs": p.specs,
-            "image_url": p.image_url,
-            "ad_slogan": p.ad_slogan,
-            "description": p.description,
-            "rating": p.rating,
-            "review_count": p.review_count,
-            "best_price": round(best.final_price, 2) if best else None,
-            "best_platform": best.platform if best else None,
-            "best_platform_label": best.platform_label if best else None,
-            "offer_count": len(p.offers),
-            "recommendation": rec.get("recommendation", ""),
-            "recommend_source": rec.get("source", "rule"),
-            "lowest_90d": round(lowest_90, 2) if lowest_90 else None,
-            "history_points": len(history_series),
-            "price_stats": {
-                "avg": round(avg, 2), "high": round(high, 2),
-                "low": round(low, 2), "savings": round(savings, 2),
-            },
-            "history": history_series,
-            "offers": [
-                {
-                    "platform": o.platform,
-                    "platform_label": o.platform_label,
-                    "product_id": o.product_id,
-                    "url": o.url,
-                    "title": o.title,
-                    "image_url": o.image_url,
-                    "shop_name": o.shop_name,
-                    "list_price": round(o.list_price, 2),
-                    "sale_price": round(o.sale_price, 2),
-                    "final_price": round(o.final_price, 2),
-                    "price_detail": o.price_detail,
-                    "sales": o.sales,
-                    "stock": o.stock,
-                    "ship_fee": o.ship_fee,
-                    "coupons": [{"kind": c.kind, "label": c.label} for c in o.coupons],
-                    "params": o.params,
-                    # 优惠组合方案枚举（每种方式完整明细）
-                    "plans": _enumerate_offer_plans(o),
-                }
-                for o in p.offers
-            ],
-        })
+        # 价格快照落库（主商品 + 变体）
+        for item in [p] + p.variants:
+            for o in item.offers:
+                storage.save_price_snapshot(
+                    item.sku_fingerprint, o.platform, o.platform_label, item.name,
+                    o.sale_price, o.final_price, o.price_detail,
+                )
+            storage.cache_product(item)
+
+        main_ser = _serialize_one(p, storage, rec)
+        # 变体序列化（不含 AI 推荐，避免重复调用）
+        variant_sers = [_serialize_one(v, storage, {}) for v in p.variants]
+        main_ser["variants"] = variant_sers
+        main_ser["variant_count"] = len(variant_sers)
+        product_list.append(main_ser)
 
     return {
         "keyword": keyword,

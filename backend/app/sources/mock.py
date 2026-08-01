@@ -58,8 +58,8 @@ class MockSource(BaseSource):
     def search(self, keyword: str, limit: int = 10) -> list[PlatformOffer]:
         """按关键词匹配模板；模板未命中时生成泛化兜底商品（保证前端不空白）
 
-        limit 语义：控制匹配的商品模板数（每个模板固定出京东/淘宝/拼多多
-        3 平台报价，保证比价看板有完整平台对比）。
+        每个模板生成多个规格变体（不同颜色/容量 → 不同价格），
+        同变体出京东/淘宝/拼多多 3 平台报价（指纹一致可合并）。
         """
         kw = keyword.strip().lower()
         offers: list[PlatformOffer] = []
@@ -69,22 +69,26 @@ class MockSource(BaseSource):
             if kw and kw not in (brand.lower() + model.lower()):
                 continue
             matched = True
-            # 同一模板 = 同一个 SKU 变体（颜色固定），保证三平台指纹一致可合并
-            color = self._rng.choice(colors)
-            title = f"{brand} {model}" + (f" {cap}G" if cap else "") + f" {color}"
-            params = self._specs_for(brand, model, cap, color)
-            for platform, label, ratio in (
-                ("jd", "京东", 1.0),
-                ("taobao", "淘宝", 0.97),
-                ("pdd", "拼多多", 0.92),
-            ):
-                price = round(base * ratio * self._rng.uniform(0.98, 1.02), 2)
-                list_price = round(price * 1.18, 2)
-                offers.append(self._make_offer(
-                    platform, label, title, price, list_price, params, brand,
-                ))
+            # 生成 2 个规格变体（不同颜色，容量档位价格不同）
+            variant_colors = self._rng.sample(colors, min(2, len(colors)))
+            for vi, color in enumerate(variant_colors):
+                # 容量档位：高配价差 +8%
+                vcap = cap
+                vbase = base * (1.08 if vi > 0 and cap else 1.0)
+                title = f"{brand} {model}" + (f" {vcap}G" if vcap else "") + f" {color}"
+                params = self._specs_for(brand, model, vcap, color)
+                for platform, label, ratio in (
+                    ("jd", "京东", 1.0),
+                    ("taobao", "淘宝", 0.97),
+                    ("pdd", "拼多多", 0.92),
+                ):
+                    price = round(vbase * ratio * self._rng.uniform(0.98, 1.02), 2)
+                    list_price = round(price * 1.18, 2)
+                    offers.append(self._make_offer(
+                        platform, label, title, price, list_price, params, brand,
+                    ))
             tmpl_count += 1
-            if tmpl_count >= max(1, limit // 3 + (1 if limit % 3 else 0)):
+            if tmpl_count >= max(1, limit // 6 + (1 if limit % 6 else 0)):
                 break
 
         # 模板未命中 → 生成基于关键词的泛化商品（保证兜底，标注演示）
@@ -120,17 +124,49 @@ class MockSource(BaseSource):
 
     @staticmethod
     def _gen_image(brand: str, model: str) -> str:
-        """生成内嵌 SVG 商品图（零外部依赖，任意环境可显示）"""
+        """生成内嵌 SVG 商品图（零外部依赖，任意环境可显示）
+
+        视觉：品牌色渐变背景 + 产品剪影（手机/耳机/吸尘器）+ 品牌标识 + 高光
+        """
         import base64
-        color = "#5B7FBE" if brand.lower() == "apple" else "#C0392B" if brand.lower() == "华为" else "#3A7D44"
+        brand_l = brand.lower()
+        color = "#5B7FBE" if brand_l == "apple" else "#C0392B" if "华为" in brand else "#3A7D44" if "小米" in brand else "#4A4A6A"
+        # 产品剪影（按型号关键词判断类别）
+        m = (model or "").lower()
+        if any(k in m for k in ("iphone", "mate", "pro", "phone", "手机")):
+            device = ('<rect x="225" y="120" width="150" height="300" rx="26" fill="rgba(255,255,255,0.92)"/>'
+                      '<rect x="245" y="140" width="110" height="240" rx="12" fill="url(#screen)"/>'
+                      '<circle cx="300" cy="392" r="8" fill="rgba(0,0,0,0.35)"/>')
+        elif any(k in m for k in ("wh", "xm", "耳机", "headphone")):
+            device = ('<path d="M170 300 h60 a70 70 0 0 1 140 0 h60" stroke="rgba(255,255,255,0.92)" '
+                      'stroke-width="20" fill="none" stroke-linecap="round"/>'
+                      '<rect x="150" y="290" width="45" height="130" rx="18" fill="rgba(255,255,255,0.85)"/>'
+                      '<rect x="405" y="290" width="45" height="130" rx="18" fill="rgba(255,255,255,0.85)"/>')
+        elif any(k in m for k in ("v15", "dyson", "吸尘", "detect")):
+            device = ('<rect x="265" y="140" width="70" height="200" rx="12" fill="rgba(255,255,255,0.9)"/>'
+                      '<rect x="255" y="320" width="90" height="30" rx="14" fill="rgba(255,255,255,0.9)"/>'
+                      '<rect x="265" y="340" width="26" height="90" rx="10" fill="rgba(255,255,255,0.75)"/>'
+                      '<rect x="309" y="340" width="26" height="90" rx="10" fill="rgba(255,255,255,0.75)"/>')
+        else:
+            device = '<rect x="230" y="160" width="140" height="220" rx="18" fill="rgba(255,255,255,0.9)"/>'
         svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600">
-<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-<stop offset="0" stop-color="{color}" stop-opacity="0.85"/><stop offset="1" stop-color="#1a1a2e"/>
-</linearGradient></defs>
+<defs>
+<linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="{color}"/><stop offset="0.6" stop-color="{color}" stop-opacity="0.75"/>
+<stop offset="1" stop-color="#141826"/>
+</linearGradient>
+<linearGradient id="screen" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#2c3852"/><stop offset="1" stop-color="#141826"/>
+</linearGradient>
+<radialGradient id="glow" cx="0.35" cy="0.25" r="0.8">
+<stop offset="0" stop-color="rgba(255,255,255,0.22)"/><stop offset="1" stop-color="rgba(255,255,255,0)"/>
+</radialGradient>
+</defs>
 <rect width="600" height="600" rx="40" fill="url(#g)"/>
-<rect x="90" y="90" width="420" height="420" rx="30" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.35)" stroke-width="3"/>
-<text x="300" y="330" font-size="90" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold" fill="white">{brand[:1]}</text>
-<text x="300" y="400" font-size="28" text-anchor="middle" font-family="Arial, sans-serif" fill="rgba(255,255,255,0.9)">{model[:14]}</text>
+<rect width="600" height="600" rx="40" fill="url(#glow)"/>
+{device}
+<text x="300" y="520" font-size="30" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold" fill="rgba(255,255,255,0.95)" letter-spacing="4">{brand[:10]}</text>
+<text x="300" y="555" font-size="19" text-anchor="middle" font-family="Arial, sans-serif" fill="rgba(255,255,255,0.65)">{model[:20]}</text>
 </svg>'''
         return "data:image/svg+xml;base64," + base64.b64encode(svg.encode("utf-8")).decode()
 
@@ -162,7 +198,8 @@ class MockSource(BaseSource):
             platform=platform, platform_label=label,
             product_id=f"{platform}-{title}-{int(price)}",
             url=f"https://example.com/{platform}/{title}",
-            title=title, image_url="",
+            image_url=MockSource._gen_image(brand, params.get("型号", "")),
+            title=title,
             shop_name=shop,
             list_price=list_price, sale_price=price,
             final_price=final, price_detail=detail,
