@@ -9,7 +9,6 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 import os
 
@@ -70,13 +69,7 @@ _FRONTEND_DIR = os.environ.get(
     "ALLPRICE_FRONTEND_DIR",
     os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend")),
 )
+# 整个前端目录挂到根路径：/ → index.html, /vue.global.prod.js → 文件
+# 注意: mount 注册在 include_router 之后，/api/* 与 /docs 优先匹配不受影响
 if os.path.isdir(_FRONTEND_DIR):
-    app.mount("/assets", StaticFiles(directory=_FRONTEND_DIR), name="assets")
-
-
-@app.get("/")
-async def root():
-    index = os.path.join(_FRONTEND_DIR, "index.html")
-    if os.path.exists(index):
-        return FileResponse(index)
-    return {"name": "AllPrice", "docs": "/docs", "health": "/api/health"}
+    app.mount("/", StaticFiles(directory=_FRONTEND_DIR, html=True), name="frontend")
