@@ -28,6 +28,9 @@ async def lifespan(app: FastAPI):
     registry: SourceRegistry = getattr(app.state, "registry", None)
     if registry is None:
         registry = SourceRegistry()
+        # 京东联盟官方 API（个人实名免费；未配置密钥自动禁用）
+        from .sources.jd_union import JdUnionSource
+        registry.register(JdUnionSource())
         # ZOL 真实报价源（手机/电脑/数码全覆盖；SSR 可抓，真实价格+参数+图）
         from .sources.zol import ZolSource
         registry.register(ZolSource())
